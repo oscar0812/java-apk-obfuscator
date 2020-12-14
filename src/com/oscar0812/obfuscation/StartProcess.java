@@ -9,13 +9,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.oscar0812.obfuscation.smali.SmaliFile;
+import com.oscar0812.obfuscation.smali.SmaliLine;
 import org.dom4j.io.SAXReader;
 import org.dom4j.*;
 
 public class StartProcess {
     // remove .line makes for harder debugging
     // (https://stackoverflow.com/questions/18274031/what-does-line-mean-in-smali-code-syntax-android-smali-code)
-    public static final boolean REMOVE_DOT_LINE = true;
+    public static final boolean REMOVE_DOT_LINE = false;
 
     private final File mainDir;
     public StartProcess(File outputDir) {
@@ -25,6 +26,7 @@ public class StartProcess {
 
     public ArrayList<SmaliFile> findFiles(File root)
     {
+        SmaliFile smaliRoot = new SmaliFile(root.getAbsolutePath());
         // meh recursion, use queue
         ArrayList<SmaliFile> smaliFiles = new ArrayList<>();
         Queue<File> q = new LinkedList<>();
@@ -41,7 +43,10 @@ public class StartProcess {
             for (File file : files) {
                 if (file.isFile()) {
                     if(file.getName().endsWith(".smali")) {
-                        smaliFiles.add(new SmaliFile(file.getAbsolutePath()));
+                        // append this smali file and set the base smali/ directory
+                        SmaliFile sf = new SmaliFile(file.getAbsolutePath());
+                        sf.setBaseSmaliDir(smaliRoot);
+                        smaliFiles.add(sf);
                     }
                 } else if (file.isDirectory()) {
                     // found directory
@@ -56,7 +61,7 @@ public class StartProcess {
     // get android package name from android manifest
     private String getAPKPackage(){
         File file = new File(mainDir, "AndroidManifest.xml");
-        Document document = null;
+        Document document;
         try {
             document = new SAXReader().read(file);
         } catch (DocumentException e) {
@@ -77,19 +82,23 @@ public class StartProcess {
 
 
         // start the max number of threads for this machine
-        ExecutorService service = Executors.newFixedThreadPool(2);
+        // ExecutorService service = Executors.newFixedThreadPool(2);
         for(SmaliFile s: smaliFiles) {
-            service.execute(s::processLines);
+            //service.execute(s::processLines);
+            s.processLines();
         }
 
         // shutdown
         // this will get blocked until all task finish
+        /*
         service.shutdown();
         try {
             service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+         */
 
 
     }

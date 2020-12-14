@@ -19,7 +19,6 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 
 public class SmaliLine {
-    public SmaliClass parentClass;
     private final String originalText;
     private final String[] parts;
 
@@ -69,16 +68,14 @@ public class SmaliLine {
         ArrayList<SmaliLine> smaliLines = new ArrayList<>();
         // some lines should be ignored
         if (!ignoreLine(text)) {
-            if(text.contains("const-string")) {
-                String[] parts = originalLine.getParts();
-                if (parts.length > 0 && parts[0].equals("const-string")) {
-                    // ["const-string", "v0,", "String here"]
-                    // obfuscate string
-                    Obfuscator obf = SmaliLine.Obfuscator.getInstance();
-                    for (SmaliLine s :obf.stringToStaticCall(originalLine)) {
-                       // System.out.println(s.getOriginalText());
-                    }
-                }
+            String[] parts = originalLine.getParts();
+            if (parts.length > 0 && parts[0].equals("const-string")) {
+                // ["const-string", "v0,", "String here"]
+                // obfuscate string
+                Obfuscator obf = SmaliLine.Obfuscator.getInstance();
+                smaliLines.addAll(obf.stringToStaticCall(originalLine));
+            } else {
+                smaliLines.add(originalLine);
             }
         }
 
@@ -86,6 +83,9 @@ public class SmaliLine {
     }
 
     public static class Obfuscator {
+        // FUNCTIONS call parent->method()
+        // parent calls child->toString()
+        // SINCE the string obfuscation creates an object and messes around with bytes in it's toString() method
 
         private static Obfuscator instance = null;
 
@@ -102,10 +102,12 @@ public class SmaliLine {
         private final Set<String> methodsUsed = new HashSet<>();
 
         public Obfuscator() {
-            // load example files
             String SMALI_DIR = "./example_smali_files/";
-            // parentFile = loadFile(SMALI_DIR + "StringUtil.smali");
-            // childFile = loadFile(SMALI_DIR + "StringUtil$1.smali");
+            parentFile = new SmaliFile(SMALI_DIR + "StringUtil.smali");
+            childFile = new SmaliFile(SMALI_DIR + "StringUtil$1.smali");
+
+            parentFile.processLines();
+            childFile.processLines();
         }
 
         private String getRandomMethodName() {
@@ -116,7 +118,7 @@ public class SmaliLine {
             do {
                 // collisions, make it longer
                 if (tries > 0 && tries % 5 == 0) {
-                    length *= 2;
+                    length += 1;
                 }
                 tries++;
 
@@ -144,9 +146,21 @@ public class SmaliLine {
 
             ArrayList<SmaliLine> lines = new ArrayList<>();
 
-            lines.add(new SmaliLine("invoke-static {}, Lcom/oscar0812/sample_navigation/StringUtil;->" + methodName + "()Ljava/lang/String;"));
-            lines.add(new SmaliLine(""));
-            lines.add(new SmaliLine("move-result-object " + register));
+            // add method to parent
+            parentFile.appendString(
+                    ".method public static " + methodName + "()Ljava/lang/String;\n\n" +
+                    "       .locals 1\n\n" +
+                    "       new-instance v0, Lcom/oscar0812/sample_navigation/StringUtil$1;\n\n" +
+                    "       invoke-direct {v0}, Lcom/oscar0812/sample_navigation/StringUtil$1;-><init>()V\n\n" +
+                    "       invoke-virtual {v0}, Lcom/oscar0812/sample_navigation/StringUtil$1;->toString()Ljava/lang/String;\n\n" +
+                    "       move-result-object v0\n\n" +
+                    "       return-object v0\n\n" +
+                    ".end method\n");
+
+            // TODO: dont hardcode path to stringUtil
+            lines.add(new SmaliLine("       invoke-static {}, Lcom/oscar0812/sample_navigation/StringUtil;->" + methodName + "()Ljava/lang/String;"));
+            // lines.add(new SmaliLine(""));
+            lines.add(new SmaliLine("       move-result-object " + register));
 
             return lines;
         }
