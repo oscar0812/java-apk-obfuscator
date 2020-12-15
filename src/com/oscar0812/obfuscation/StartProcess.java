@@ -45,7 +45,6 @@ public class StartProcess {
                     if(file.getName().endsWith(".smali")) {
                         // append this smali file and set the base smali/ directory
                         SmaliFile sf = new SmaliFile(file.getAbsolutePath());
-                        sf.setBaseSmaliDir(smaliRoot);
                         smaliFiles.add(sf);
                     }
                 } else if (file.isDirectory()) {

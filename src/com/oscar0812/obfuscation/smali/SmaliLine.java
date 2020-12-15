@@ -2,11 +2,9 @@ package com.oscar0812.obfuscation.smali;
 
 import com.oscar0812.obfuscation.StartProcess;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -22,8 +20,14 @@ public class SmaliLine {
     private final String originalText;
     private final String[] parts;
 
-    public SmaliLine(String originalText) {
+    private final SmaliFile inFile;
+
+    public SmaliLine(String originalText, SmaliFile inFile) {
         this.originalText = originalText;
+
+        assert inFile != null;
+        this.inFile = inFile;
+
         String trimmed = originalText.trim();
         ArrayList<String> partList = new ArrayList<>();
         if (trimmed.startsWith("const-string")) {
@@ -51,6 +55,10 @@ public class SmaliLine {
         return parts;
     }
 
+    public SmaliFile getInFile() {
+        return inFile;
+    }
+
     public boolean isEmpty() {
         return originalText.trim().isEmpty();
     }
@@ -63,8 +71,8 @@ public class SmaliLine {
     }
 
     // 1 line of text can become nothing (if ignored) or multiple lines (i.e, reflection makes multiple lines)
-    public static ArrayList<SmaliLine> process(String text) {
-        SmaliLine originalLine = new SmaliLine(text);
+    public static ArrayList<SmaliLine> process(String text, SmaliFile inFile) {
+        SmaliLine originalLine = new SmaliLine(text, inFile);
         ArrayList<SmaliLine> smaliLines = new ArrayList<>();
         // some lines should be ignored
         if (!ignoreLine(text)) {
@@ -96,21 +104,15 @@ public class SmaliLine {
             return instance;
         }
 
-        private SmaliFile parentFile;
-        private SmaliFile childFile;
+        private final Set<String> stringsUsed = new HashSet<>();
+        // parent = StringUtil
+        private final HashMap<String, SmaliFile> parentFiles = new HashMap<>();
+        private final ArrayList<String> parentFileKeys = new ArrayList<>();
 
-        private final Set<String> methodsUsed = new HashSet<>();
+        // children = StringUtil$1, StringUtil$1, etc...
+        private final HashMap<String, SmaliFile> childFiles = new HashMap<>();
 
-        public Obfuscator() {
-            String SMALI_DIR = "./example_smali_files/";
-            parentFile = new SmaliFile(SMALI_DIR + "StringUtil.smali");
-            childFile = new SmaliFile(SMALI_DIR + "StringUtil$1.smali");
-
-            parentFile.processLines();
-            childFile.processLines();
-        }
-
-        private String getRandomMethodName() {
+        private String getRandomUniqueString() {
             String alphabet = "abcdefghijklmnopqrstuvwxyz";
             StringBuilder builder = new StringBuilder();
             int length = 2;
@@ -129,11 +131,80 @@ public class SmaliLine {
                     int randomNum = ThreadLocalRandom.current().nextInt(0, alphabet.length());
                     builder.append(alphabet.charAt(randomNum));
                 }
-            } while (methodsUsed.contains(builder.toString()));
+            } while (stringsUsed.contains(builder.toString()));
 
-            methodsUsed.add(builder.toString());
+            stringsUsed.add(builder.toString());
 
             return builder.toString();
+        }
+
+        private SmaliFile createNewFile(SmaliFile siblingFile) {
+            // create a file with a name that doesn't exist in the same directory as siblingFile
+            SmaliFile file;
+            String fileClassName;
+            do {
+                fileClassName = getRandomUniqueString();
+                file = new SmaliFile(siblingFile.getParentFile(), fileClassName + ".smali");
+            } while (file.exists());
+
+            String sp = siblingFile.getSmaliPackage();           // Lcom/oscar0812/sample_navigation/BuildConfig;
+            sp = sp.substring(0, sp.lastIndexOf("/") + 1);      // Lcom/oscar0812/sample_navigation/
+            sp += fileClassName + ";";                            // Lcom/oscar0812/sample_navigation/okxd;
+
+            // set the package and class
+            file.setSmaliPackage(sp);
+            return file;
+        }
+
+        // parent smali of string obfuscator object (look at StringUtil.smali)
+        private SmaliFile createParentFile(SmaliLine line) {
+            SmaliFile parentFile = createNewFile(line.getInFile());
+
+            parentFile.appendString(
+                    ".class public " + parentFile.getSmaliPackage() + "\n" +
+                            ".super Ljava/lang/Object;\n" +
+                            ".source \"" + parentFile.getSmaliClass() + ".java\"\n\n\n" +
+                            "# direct methods\n" +
+                            ".method public constructor <init>()V\n" +
+                            "    .locals 0\n\n" +
+                            "    invoke-direct {p0}, Ljava/lang/Object;-><init>()V\n\n" +
+                            "    return-void\n" +
+                            ".end method\n\n");
+
+            parentFileKeys.add(parentFile.getAbsolutePath());
+            parentFiles.put(parentFile.getAbsolutePath(), parentFile);
+
+            return parentFile;
+        }
+
+        // parent smali of string obfuscator object (look at StringUtil$1.smali)
+        private SmaliFile createChildFile(SmaliFile parentFile, SmaliLine smaliLine, String methodName) {
+            SmaliFile childFile = createNewFile(parentFile);
+
+            childFile.appendString(".class final " + childFile.getSmaliPackage() + "\n" +
+                    ".super Ljava/lang/Object;\n" +
+                    ".source \"" + childFile.getSmaliClass() + ".java\"\n\n\n" +
+                    "# annotations\n" +
+                    ".annotation system Ldalvik/annotation/EnclosingMethod;\n" +
+                    "    value = " + parentFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;\n" +
+                    ".end annotation\n\n" +
+                    ".annotation system Ldalvik/annotation/InnerClass;\n" +
+                    "    accessFlags = 0x8\n" +
+                    "    name = null\n" +
+                    ".end annotation\n\n\n" +
+                    "# instance fields\n" +
+                    ".field t:I\n\n\n" +
+                    "# direct methods\n" +
+                    ".method constructor <init>()V\n" +
+                    "    .locals 0\n\n" +
+                    "    invoke-direct {p0}, Ljava/lang/Object;-><init>()V\n\n" +
+                    "    return-void\n" +
+                    ".end method\n\n\n" +
+                    "# virtual methods\n" +
+                    ".method public toString()Ljava/lang/String;\n"+
+                    "    .locals 4\n\n");
+
+            return childFile;
         }
 
         // const-string v0, "Replace with your own action" =>
@@ -142,25 +213,38 @@ public class SmaliLine {
         // move-result-object v0
         public ArrayList<SmaliLine> stringToStaticCall(SmaliLine line) {
             String register = line.getParts()[1].replace(",", ""); // v0, => v0
-            String methodName = getRandomMethodName();
+            String methodName = getRandomUniqueString();
 
-            ArrayList<SmaliLine> lines = new ArrayList<>();
+            int randomNum = ThreadLocalRandom.current().nextInt(0, parentFileKeys.size() + 2);
+
+            SmaliFile parentFile;
+            if (randomNum >= parentFileKeys.size()) {
+                parentFile = createParentFile(line);
+            } else {
+                parentFile = parentFiles.get(parentFileKeys.get(randomNum));
+            }
+
+            // TODO: LEFT WORK HERE!
+
+            SmaliFile childFile = createChildFile(parentFile, line, methodName);
 
             // add method to parent
             parentFile.appendString(
-                    ".method public static " + methodName + "()Ljava/lang/String;\n\n" +
-                    "       .locals 1\n\n" +
-                    "       new-instance v0, Lcom/oscar0812/sample_navigation/StringUtil$1;\n\n" +
-                    "       invoke-direct {v0}, Lcom/oscar0812/sample_navigation/StringUtil$1;-><init>()V\n\n" +
-                    "       invoke-virtual {v0}, Lcom/oscar0812/sample_navigation/StringUtil$1;->toString()Ljava/lang/String;\n\n" +
-                    "       move-result-object v0\n\n" +
-                    "       return-object v0\n\n" +
-                    ".end method\n");
+                    ".method public static " + methodName + "()Ljava/lang/String;\n" +
+                            "       .locals 1\n\n" +
+                            "       new-instance v0, Lcom/oscar0812/sample_navigation/StringUtil$1;\n\n" +
+                            "       invoke-direct {v0}, Lcom/oscar0812/sample_navigation/StringUtil$1;-><init>()V\n\n" +
+                            "       invoke-virtual {v0}, Lcom/oscar0812/sample_navigation/StringUtil$1;->toString()Ljava/lang/String;\n\n" +
+                            "       move-result-object v0\n\n" +
+                            "       return-object v0\n" +
+                            ".end method\n\n");
 
-            // TODO: dont hardcode path to stringUtil
-            lines.add(new SmaliLine("       invoke-static {}, Lcom/oscar0812/sample_navigation/StringUtil;->" + methodName + "()Ljava/lang/String;"));
+            parentFile.saveToDisk();
+
+            ArrayList<SmaliLine> lines = new ArrayList<>();
+            lines.add(new SmaliLine("       invoke-static {}, Lcom/oscar0812/sample_navigation/StringUtil;->" + methodName + "()Ljava/lang/String;", line.getInFile()));
             // lines.add(new SmaliLine(""));
-            lines.add(new SmaliLine("       move-result-object " + register));
+            lines.add(new SmaliLine("       move-result-object " + register, line.getInFile()));
 
             return lines;
         }

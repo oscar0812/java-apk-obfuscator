@@ -4,8 +4,8 @@ import java.io.PrintStream;
 import java.util.Random;
 
 public class TestStrObf {
-    public static void main(String[] args) {
-        String a = (new Object() {
+    public static String methodA() {
+        return (new Object() {
             int t;
 
             public String toString() {
@@ -97,6 +97,9 @@ public class TestStrObf {
                 return new String(buf);
             }
         }.toString());
+    }
+    public static void main(String[] args) {
+        String a = methodA();
 
         // i is the index. i=24
         // tr is random.                                                00000011001000101000001010100001,   52593313_10
