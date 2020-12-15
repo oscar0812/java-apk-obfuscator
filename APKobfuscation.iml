@@ -11,5 +11,14 @@
     <orderEntry type="library" name="uber-apk-signer-1.2.1" level="project" />
     <orderEntry type="library" name="apktool_2.5.0" level="project" />
     <orderEntry type="library" name="org.dom4j:dom4j:2.1.3" level="application" />
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MAVEN_REPOSITORY$/org/jetbrains/annotations/19.0.0/annotations-19.0.0.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
   </component>
 </module>
