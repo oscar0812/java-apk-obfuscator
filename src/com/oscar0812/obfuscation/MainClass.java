@@ -77,7 +77,7 @@ public class MainClass {
         // remove the .apk and make it a directory for output (apktool write)
         File outputDir = new File(apkFile.getAbsolutePath().substring(0, apkFile.getAbsolutePath().lastIndexOf('.')));
 
-        // decompileWithAPKTool(apkFile, outputDir);
+        decompileWithAPKTool(apkFile, outputDir);
         System.out.println("==== DONE DECOMPILING ====");
         // TODO: work on obfuscate
         StartProcess obf = new StartProcess(outputDir);
@@ -90,7 +90,6 @@ public class MainClass {
         MainClass m = new MainClass();
         m.start();
 
-        // SmaliStringObfuscator s = new SmaliStringObfuscator();
-
+        // SmaliStringObfuscator s = new SmaliStringObfuscator()
     }
 }

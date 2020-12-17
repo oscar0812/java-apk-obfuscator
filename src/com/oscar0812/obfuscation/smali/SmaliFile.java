@@ -11,6 +11,8 @@ public class SmaliFile extends File {
     private String smaliPackage = "";
     private String smaliClass = "";
 
+    public long debugLine = 50;
+
     public SmaliFile(String pathname) {
         super(pathname);
     }
@@ -85,17 +87,22 @@ public class SmaliFile extends File {
 
     public void saveToDisk() {
         try {
-            FileWriter writer = new FileWriter(new File(getAbsolutePath()), false);
+            if(exists() || createNewFile()) {
 
-            for (SmaliLine line: lines) {
-                writer.write(line.getOriginalText());
-                writer.write("\n");
-                if(line.getParts()[0].equals(".end")) {
+                FileWriter writer = new FileWriter(new File(getAbsolutePath()), false);
+
+                for (SmaliLine line : lines) {
+                    writer.write(line.getOriginalText());
                     writer.write("\n");
+                    if (line.getParts()[0].equals(".end")) {
+                        writer.write("\n");
+                    }
                 }
-            }
 
-            writer.close();
+                writer.close();
+            } else {
+                System.out.println("COULDN'T CREATE FILE: "+getAbsolutePath());
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
