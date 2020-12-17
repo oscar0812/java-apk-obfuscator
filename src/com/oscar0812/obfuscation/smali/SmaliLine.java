@@ -1,5 +1,6 @@
 package com.oscar0812.obfuscation.smali;
 
+import com.oscar0812.obfuscation.MainClass;
 import com.oscar0812.obfuscation.StartProcess;
 
 import java.util.*;
@@ -62,7 +63,7 @@ public class SmaliLine {
 
     private static boolean ignoreLine(String text) {
         String trimmed = text.trim();
-        boolean ignore = StartProcess.REMOVE_DOT_LINE && trimmed.startsWith(".line");
+        boolean ignore = MainClass.REMOVE_DOT_LINE && trimmed.startsWith(".line");
 
         return ignore;
     }

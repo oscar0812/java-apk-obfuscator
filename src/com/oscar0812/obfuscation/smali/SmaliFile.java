@@ -1,5 +1,8 @@
 package com.oscar0812.obfuscation.smali;
 
+import com.oscar0812.obfuscation.APKInfo;
+import com.oscar0812.obfuscation.MainClass;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -49,6 +52,7 @@ public class SmaliFile extends File {
         this.smaliClass = smaliClass;
     }
 
+    // THIS method starts the process for this file
     public void processLines() {
         // System.out.println("PROCESSING: "+getAbsolutePath());
         // read file line by line
@@ -63,10 +67,21 @@ public class SmaliFile extends File {
             e.printStackTrace();
         }
 
+        saveToDisk();
+
         // System.out.println("PROCESSED: "+getAbsolutePath());
     }
 
     private void processSingleLine(String line) {
+        String manifestPackage = APKInfo.getInstance().getManifestPackage(); // com.oscar0812.sample_navigation
+        String mainSmaliPackage = "L"+manifestPackage.replace(".", "/")+"/"; // Lcom/oscar0812/sample_navigation/
+
+        if(!smaliPackage.isEmpty() && MainClass.ONLY_OBFUSCATE_MAIN_PACKAGE && !smaliPackage.startsWith(mainSmaliPackage)) {
+            // DO NOT PROCESS
+            lines.add(new SmaliLine(line, this));
+            return;
+        }
+
         ArrayList<SmaliLine> processedLines = SmaliLine.process(line, this);
 
         if(smaliPackage.isEmpty()) {

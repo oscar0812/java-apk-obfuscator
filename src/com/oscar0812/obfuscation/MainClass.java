@@ -20,7 +20,8 @@ import java.util.Arrays;
 
 
 public class MainClass {
-    private final static String APK_NAME = "sample_navigation.apk";
+    public static final boolean REMOVE_DOT_LINE = false;
+    public static final boolean ONLY_OBFUSCATE_MAIN_PACKAGE = true; // for debugging, dont want to wait
 
     private void callAPKTool(String[] params) {
         System.out.println("\n" + Arrays.toString(params));
@@ -65,7 +66,7 @@ public class MainClass {
             return;
         }
 
-        File apkFile = new File(apkDir, APK_NAME);
+        File apkFile = new File(apkDir, APKInfo.getInstance().getName());
 
         if (!apkFile.exists()) {
             System.out.println("APK file doesn't exist");
@@ -77,13 +78,15 @@ public class MainClass {
         // remove the .apk and make it a directory for output (apktool write)
         File outputDir = new File(apkFile.getAbsolutePath().substring(0, apkFile.getAbsolutePath().lastIndexOf('.')));
 
-        decompileWithAPKTool(apkFile, outputDir);
+        APKInfo.getInstance().setOutputDir(outputDir);
+
+        // decompileWithAPKTool(apkFile, outputDir);
         System.out.println("==== DONE DECOMPILING ====");
         // TODO: work on obfuscate
-        StartProcess obf = new StartProcess(outputDir);
-        obf.obfuscate();
-        // buildWithAPKTool(outputDir);
-        // signAPKWithUber(apkFile, apkDir, outputDir);
+        // StartProcess obf = new StartProcess();
+        // obf.obfuscate();
+        buildWithAPKTool(outputDir);
+        signAPKWithUber(apkFile, apkDir, outputDir);
     }
 
     public static void main(String[] args) {

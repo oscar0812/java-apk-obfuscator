@@ -181,10 +181,9 @@ public class SmaliLineObfuscator {
 
         obfFile.saveToDisk();
 
-
-        lines.add(new SmaliLine("       invoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getInFile()));
-        // lines.add(new SmaliLine(""));
-        lines.add(new SmaliLine("       move-result-object " + register, line.getInFile()));
+        lines.add(new SmaliLine("\t\tinvoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getInFile()));
+        lines.add(new SmaliLine("", line.getInFile()));
+        lines.add(new SmaliLine("\t\tmove-result-object " + register, line.getInFile()));
 
         return lines;
     }

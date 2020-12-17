@@ -16,17 +16,9 @@ import org.dom4j.*;
 public class StartProcess {
     // remove .line makes for harder debugging
     // (https://stackoverflow.com/questions/18274031/what-does-line-mean-in-smali-code-syntax-android-smali-code)
-    public static final boolean REMOVE_DOT_LINE = false;
-
-    private final File mainDir;
-    public StartProcess(File outputDir) {
-        mainDir = outputDir;
-    }
-
 
     public ArrayList<SmaliFile> findFiles(File root)
     {
-        SmaliFile smaliRoot = new SmaliFile(root.getAbsolutePath());
         // meh recursion, use queue
         ArrayList<SmaliFile> smaliFiles = new ArrayList<>();
         Queue<File> q = new LinkedList<>();
@@ -57,21 +49,7 @@ public class StartProcess {
         return smaliFiles;
     }
 
-    // get android package name from android manifest
-    private String getAPKPackage(){
-        File file = new File(mainDir, "AndroidManifest.xml");
-        Document document;
-        try {
-            document = new SAXReader().read(file);
-        } catch (DocumentException e) {
-            e.printStackTrace();
-            return null;
-        }
 
-        assert document != null;
-        Attribute p = document.getRootElement().attribute("package");
-        return (String) p.getData();
-    }
 
     // read the files in parallel to finish faster (might be alot of files)
     private void processFiles(ArrayList<SmaliFile> smaliFiles) {
@@ -104,12 +82,9 @@ public class StartProcess {
 
     // start the obfuscation process
     public void obfuscate() {
-        String APKPackageName = getAPKPackage();
-
-        assert APKPackageName != null;
 
         // TODO: what about apks with smali/ AND smali_classes2/
-        File smaliDir = new File(mainDir, "smali");
+        File smaliDir = new File(APKInfo.getInstance().getOutputDir(), "smali");
         if(!(smaliDir.exists() && smaliDir.isDirectory())) {
             System.out.println("SMALI folder not found");
             return;
@@ -117,12 +92,6 @@ public class StartProcess {
 
         // get all files in smali/ directory
         ArrayList<SmaliFile> smaliFiles = findFiles(smaliDir);
-
-        // String nameR = APKPackageName.replace(".", File.separator); // com.pack.one -> com\pack\one
-        // System.out.println("PACKAGE: "+ nameR);
-        // main smali directory ... main package
-        // File mainSmaliDirectory = new File(smaliDir, nameR);
-        // System.out.println(mainSmaliDirectory);
 
         processFiles(smaliFiles); // read files line by line and extract SmaliLine's (class)
 
