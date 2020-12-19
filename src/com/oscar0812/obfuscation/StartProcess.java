@@ -4,14 +4,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Queue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import com.oscar0812.obfuscation.smali.SmaliFile;
-import com.oscar0812.obfuscation.smali.SmaliLine;
-import org.dom4j.io.SAXReader;
-import org.dom4j.*;
 
 public class StartProcess {
     // remove .line makes for harder debugging
@@ -84,7 +78,7 @@ public class StartProcess {
     public void obfuscate() {
 
         // TODO: what about apks with smali/ AND smali_classes2/
-        File smaliDir = new File(APKInfo.getInstance().getOutputDir(), "smali");
+        File smaliDir = APKInfo.getInstance().getSmaliDir();
         if(!(smaliDir.exists() && smaliDir.isDirectory())) {
             System.out.println("SMALI folder not found");
             return;

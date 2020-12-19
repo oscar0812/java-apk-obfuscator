@@ -59,34 +59,23 @@ public class MainClass {
 
 
     private void start() {
-        // apk has to be in apks/ folder
-        File apkDir = new File(System.getProperty("user.dir") + File.separator + "apks");
-        if (!apkDir.exists()) {
-            System.out.println("No APKS directory");
-            return;
-        }
-
-        File apkFile = new File(apkDir, APKInfo.getInstance().getName());
-
-        if (!apkFile.exists()) {
-            System.out.println("APK file doesn't exist");
-            return;
-        }
-
-        System.out.println("APK file: " + apkFile);
-
-        // remove the .apk and make it a directory for output (apktool write)
-        File outputDir = new File(apkFile.getAbsolutePath().substring(0, apkFile.getAbsolutePath().lastIndexOf('.')));
-
-        APKInfo.getInstance().setOutputDir(outputDir);
+        APKInfo.setApkName("timber.apk");
+        // APKInfo.setApkName("sample_navigation.apk");
+        APKInfo info = APKInfo.getInstance();
+        File apkFile = info.getApkFile();
+        File apkDir = info.getProjectApkDir();
+        File outputDir = info.getApkDecompileDir();
 
         // decompileWithAPKTool(apkFile, outputDir);
         System.out.println("==== DONE DECOMPILING ====");
         // TODO: work on obfuscate
         // StartProcess obf = new StartProcess();
         // obf.obfuscate();
-        buildWithAPKTool(outputDir);
-        signAPKWithUber(apkFile, apkDir, outputDir);
+
+
+
+        // buildWithAPKTool(outputDir);
+        //signAPKWithUber(apkFile, apkDir, outputDir);
     }
 
     public static void main(String[] args) {

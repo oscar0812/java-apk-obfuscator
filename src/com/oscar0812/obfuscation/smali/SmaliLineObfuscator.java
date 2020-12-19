@@ -111,14 +111,14 @@ public class SmaliLineObfuscator {
 
         obfFile.appendString(
                 ".method public static "+methodName+"()Ljava/lang/String;\n" +
-                "    .locals 4\n\n");
+                "\t.locals 4\n\n");
 
         String ogString = smaliLine.getParts()[smaliLine.getParts().length - 1]; // the last index holds the string
         int byteSize = ogString.length();
         String constType = getConstTypeForInt(byteSize);
         String sizeHex = "0x" + Integer.toHexString(byteSize);
 
-        obfFile.appendString("\t\t" + constType + " v0, " + sizeHex + "\n\n\t\tnew-array v0, v0, [B");
+        obfFile.appendString("\t" + constType + " v0, " + sizeHex + "\n\n\tnew-array v0, v0, [B");
 
         Random r = new Random(System.currentTimeMillis());
         byte[] b = ogString.getBytes();
@@ -139,19 +139,19 @@ public class SmaliLineObfuscator {
 
             String indexHex = "0x" + Integer.toHexString(i);
             obfFile.appendString(
-                    "\t\t.line " + (obfFile.debugLine++) + "\n" +
-                            "\t\tconst v1, " + tHex + "\n\n" +
-                            "\t\tushr-int/lit8 v2, v1, " + fHex +"\n\n" +
-                            "\t\tint-to-byte v2, v2\n\n" +
-                            "\t\t" + getConstTypeForInt(i) + " v3, " + indexHex + "\n\n" +
-                            "\t\taput-byte v2, v0, v3\n\n");
+                    "\t.line " + (obfFile.debugLine++) + "\n" +
+                            "\tconst v1, " + tHex + "\n\n" +
+                            "\tushr-int/lit8 v2, v1, " + fHex +"\n\n" +
+                            "\tint-to-byte v2, v2\n\n" +
+                            "\t" + getConstTypeForInt(i) + " v3, " + indexHex + "\n\n" +
+                            "\taput-byte v2, v0, v3\n\n");
 
         }
 
-        obfFile.appendString("\t\t.line " + obfFile.debugLine + "\n" +
-                "\t\tnew-instance v2, Ljava/lang/String;\n\n" +
-                "\t\tinvoke-direct {v2, v0}, Ljava/lang/String;-><init>([B)V\n\n"+
-                "\t\treturn-object v2\n" +
+        obfFile.appendString("\t.line " + obfFile.debugLine + "\n" +
+                "\tnew-instance v2, Ljava/lang/String;\n\n" +
+                "\tinvoke-direct {v2, v0}, Ljava/lang/String;-><init>([B)V\n\n"+
+                "\treturn-object v2\n" +
                 ".end method");
 
         obfFile.debugLine+=10;
@@ -181,9 +181,9 @@ public class SmaliLineObfuscator {
 
         obfFile.saveToDisk();
 
-        lines.add(new SmaliLine("\t\tinvoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getInFile()));
+        lines.add(new SmaliLine("\tinvoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getInFile()));
         lines.add(new SmaliLine("", line.getInFile()));
-        lines.add(new SmaliLine("\t\tmove-result-object " + register, line.getInFile()));
+        lines.add(new SmaliLine("\tmove-result-object " + register, line.getInFile()));
 
         return lines;
     }
