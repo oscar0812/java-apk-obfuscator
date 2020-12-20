@@ -1,10 +1,11 @@
 package com.oscar0812.obfuscation.smali;
 
+import com.oscar0812.obfuscation.APKInfo;
 import com.oscar0812.obfuscation.MainClass;
-import com.oscar0812.obfuscation.StartProcess;
+import com.oscar0812.obfuscation.StringUtils;
 
+import java.io.File;
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * const/4 is for 0-7 (fit in 8 bits)
@@ -78,10 +79,27 @@ public class SmaliLine {
             if (parts.length > 0 && parts[0].equals("const-string")) {
                 // ["const-string", "v0,", "String here"]
                 // obfuscate string
-                SmaliLineObfuscator obf = SmaliLineObfuscator.getInstance();
-                smaliLines.addAll(obf.stringToStaticCall(originalLine));
+                // SmaliLineObfuscator obf = SmaliLineObfuscator.getInstance();
+                // smaliLines.addAll(obf.stringToStaticCall(originalLine));
             } else {
-                smaliLines.add(originalLine);
+                // smaliLines.add(originalLine);
+            }
+            smaliLines.add(originalLine);
+
+            // check if lines reference any class within the main package
+            HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getSmaliFileMap();
+            for (SmaliLine smaliLine : smaliLines) {
+                File smaliDir = APKInfo.getInstance().getSmaliDir();
+                for (String s : StringUtils.getSmaliClassSubstrings(text)) {
+                    // remove L and ;
+                    String subpath = s.substring(1, s.length() - 1);
+                    File referencedFile = new File(smaliDir, subpath + ".smali");
+
+                    if (smaliFileMap.containsKey(referencedFile.getAbsolutePath())) {
+                        // referenced class is in main package (I don't want to obfuscate ALL files including libs)
+                        smaliFileMap.get(referencedFile.getAbsolutePath()).addReferenceLine(smaliLine);
+                    }
+                }
             }
         }
 

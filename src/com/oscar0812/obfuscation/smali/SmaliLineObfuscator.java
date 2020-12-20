@@ -1,5 +1,7 @@
 package com.oscar0812.obfuscation.smali;
 
+import com.oscar0812.obfuscation.StringUtils;
+
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -18,45 +20,18 @@ public class SmaliLineObfuscator {
     }
 
     private final Set<String> stringsUsed = new HashSet<>();
-    // parent = StringUtil
-    private final HashMap<String, SmaliFile> parentFiles = new HashMap<>();
-    private final ArrayList<String> parentFileKeys = new ArrayList<>();
+    private final HashMap<String, SmaliFile> obfFileMap = new HashMap<>();
+    private final ArrayList<String> obfFilePaths = new ArrayList<>();
 
     // children = StringUtil$1, StringUtil$1, etc...
     private final HashMap<String, SmaliFile> childFiles = new HashMap<>();
-
-    private String getRandomUniqueString() {
-        String alphabet = "abcdefghijklmnopqrstuvwxyz";
-        StringBuilder builder = new StringBuilder();
-        int length = 2;
-        int tries = 0;
-        do {
-            // collisions, make it longer
-            if (tries > 0 && tries % 5 == 0) {
-                length += 1;
-            }
-            tries++;
-
-            // clear out string builder
-            builder.setLength(0);
-            // make a random string
-            for (int x = 0; x < length; x++) {
-                int randomNum = ThreadLocalRandom.current().nextInt(0, alphabet.length());
-                builder.append(alphabet.charAt(randomNum));
-            }
-        } while (stringsUsed.contains(builder.toString()));
-
-        stringsUsed.add(builder.toString());
-
-        return builder.toString();
-    }
 
     private SmaliFile createNewFile(SmaliFile siblingFile) {
         // create a file with a name that doesn't exist in the same directory as siblingFile
         SmaliFile file;
         String fileClassName;
         do {
-            fileClassName = getRandomUniqueString();
+            fileClassName = StringUtils.getRandomUniqueString();
             file = new SmaliFile(siblingFile.getParentFile(), fileClassName + ".smali");
         } while (file.exists());
 
@@ -84,8 +59,8 @@ public class SmaliLineObfuscator {
                         "    return-void\n" +
                         ".end method\n\n");
 
-        parentFileKeys.add(obfFile.getAbsolutePath());
-        parentFiles.put(obfFile.getAbsolutePath(), obfFile);
+        obfFilePaths.add(obfFile.getAbsolutePath());
+        obfFileMap.put(obfFile.getAbsolutePath(), obfFile);
 
         return obfFile;
     }
@@ -165,21 +140,21 @@ public class SmaliLineObfuscator {
         ArrayList<SmaliLine> lines = new ArrayList<>();
 
         String register = line.getParts()[1].replace(",", ""); // v0, => v0
-        String methodName = getRandomUniqueString();
+        String methodName = StringUtils.getRandomUniqueString();
 
-        int randomNum = ThreadLocalRandom.current().nextInt(0, parentFileKeys.size() + 2);
+        int randomNum = ThreadLocalRandom.current().nextInt(0, obfFilePaths.size() + 2);
         // int randomNum = 0;
 
         SmaliFile obfFile;
-        if (randomNum >= parentFileKeys.size()) {
+        if (randomNum >= obfFilePaths.size()) {
             obfFile = createObfFile(line);
         } else {
-            obfFile = parentFiles.get(parentFileKeys.get(randomNum));
+            obfFile = obfFileMap.get(obfFilePaths.get(randomNum));
         }
 
         appendMethod(obfFile, line, methodName);
 
-        obfFile.saveToDisk();
+        // obfFile.saveToDisk();
 
         lines.add(new SmaliLine("\tinvoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getInFile()));
         lines.add(new SmaliLine("", line.getInFile()));

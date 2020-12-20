@@ -18,6 +18,8 @@ public class APKInfo {
     private String manifestPackage;
 
     private SmaliFile RSmaliFile;
+    private final HashMap<String, SmaliFile> smaliFileMap = new HashMap<>();
+    private final ArrayList<SmaliFile> smaliFileList = new ArrayList<>();
 
     private final ArrayList<File> mainManifestFiles = new ArrayList<>();
 
@@ -49,10 +51,12 @@ public class APKInfo {
             } else {
                 // remove the .apk and make it a directory for output (apktool write)
                 apkDecompileDir = new File(apkFile.getAbsolutePath().substring(0, apkFile.getAbsolutePath().lastIndexOf('.')));
+
+                // TODO: what about apks with smali/ AND smali_classes2/
                 smaliDir = new File(apkDecompileDir, "smali");
 
                 manifestFileInfo();
-                fetchRSmali();
+                fetchSmaliFiles();
             }
         }
     }
@@ -77,16 +81,24 @@ public class APKInfo {
         return manifestPackage;
     }
 
-    public SmaliFile getRSmaliFile() {
-        return RSmaliFile;
-    }
-
     public ArrayList<File> getMainManifestFiles() {
         return mainManifestFiles;
     }
 
+    public SmaliFile getRSmaliFile() {
+        return RSmaliFile;
+    }
+
+    public HashMap<String, SmaliFile> getSmaliFileMap() {
+        return smaliFileMap;
+    }
+
+    public ArrayList<SmaliFile> getSmaliFileList() {
+        return smaliFileList;
+    }
+
     // get android info from android manifest
-    private void manifestFileInfo(){
+    private void manifestFileInfo() {
         File manifestFile = new File(apkDecompileDir, "AndroidManifest.xml");
         Document document;
         try {
@@ -98,33 +110,32 @@ public class APKInfo {
 
         assert document != null;
         Element manifestTag = document.getRootElement();
-        manifestPackage = (String)manifestTag.attribute("package").getData();
+        manifestPackage = (String) manifestTag.attribute("package").getData();
 
         Set<String> visitedFiles = new HashSet<>();
 
-        for (Element manifestChildren: manifestTag.elements()) {
-            if(manifestChildren.getName().equals("application")) {
-                for(Element applicationChildren: manifestChildren.elements()){
+        for (Element manifestChildren : manifestTag.elements()) {
+            if (manifestChildren.getName().equals("application")) {
+                for (Element applicationChildren : manifestChildren.elements()) {
                     // application children (activity, receiver, service, ...)
                     String attrValue = applicationChildren.attributeValue("name"); // com.oscar0812.sample_navigation.MainActivity
-                    // don't check library files
-                    if(attrValue.contains(manifestPackage)) {
-                        String sf = attrValue.replace(".", File.separator) + ".smali"; // com\oscar0812\sample_navigation\MainActivity.smali
 
-                        File file = new File(smaliDir, sf);
-                        if (!visitedFiles.contains(file.getAbsolutePath())) {
-                            if (file.exists()) {
-                                mainManifestFiles.add(file);
-                            }
-                            visitedFiles.add(file.getAbsolutePath());
+                    String sf = attrValue.replace(".", File.separator) + ".smali"; // com\oscar0812\sample_navigation\MainActivity.smali
+
+                    File file = new File(smaliDir, sf);
+                    if (!visitedFiles.contains(file.getAbsolutePath())) {
+                        if (file.exists()) {
+                            mainManifestFiles.add(file);
                         }
+                        visitedFiles.add(file.getAbsolutePath());
                     }
+
                 }
             }
         }
     }
 
-    private void fetchRSmali() {
+    private void fetchSmaliFiles() {
         // ok got the main files, now search for R.smali, that should tell us what the root directory of the apk is
         Queue<File> q = new LinkedList<>(mainManifestFiles);
         Set<String> visitedFiles = new HashSet<>();
@@ -135,14 +146,14 @@ public class APKInfo {
 
             // only visit a folder once. Don't waste time
             if(!visitedFiles.contains(parent.getAbsolutePath())) {
-                System.out.println("CHECKING: "+f.getAbsolutePath());
+                // System.out.println("CHECKING: "+f.getAbsolutePath());
                 File r = new File(parent, "R.smali");
 
                 if (r.exists()) {
                     File rID = new File(parent, "R$id.smali");
                     // every R.smali comes with a R$id.smali by design
                     if(rID.exists()) {
-                        RSmaliFile = new SmaliFile("R.smali");
+                        RSmaliFile = new SmaliFile(parent,"R.smali");
                         break;
                     }
                 } else if(!parent.getAbsolutePath().equals(smaliDir.getAbsolutePath())) {
@@ -151,6 +162,34 @@ public class APKInfo {
                 }
 
                 visitedFiles.add(parent.getAbsolutePath());
+            }
+        }
+
+        // got R.smali, now get all files in smali/main_package directory
+        // meh recursion, use queue
+        q.clear();
+        q.add(RSmaliFile.getParentFile());
+
+        while (!q.isEmpty()) {
+            File parent = q.poll(); // retrieve and remove the first element
+            File[] files = parent.listFiles();
+
+            if(files == null) {
+                continue;
+            }
+
+            for (File file : files) {
+                if (file.isFile()) {
+                    if(file.getName().endsWith(".smali")) {
+                        // append this smali file
+                        SmaliFile sf = new SmaliFile(file.getAbsolutePath());
+                        smaliFileMap.put(sf.getAbsolutePath(), sf);
+                        smaliFileList.add(sf);
+                    }
+                } else if (file.isDirectory()) {
+                    // found directory
+                    q.add(file);
+                }
             }
         }
     }

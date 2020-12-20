@@ -1,9 +1,11 @@
 package com.oscar0812.obfuscation;
 
 import brut.common.BrutException;
+import com.oscar0812.obfuscation.smali.SmaliFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /*
@@ -21,7 +23,6 @@ import java.util.Arrays;
 
 public class MainClass {
     public static final boolean REMOVE_DOT_LINE = false;
-    public static final boolean ONLY_OBFUSCATE_MAIN_PACKAGE = true; // for debugging, dont want to wait
 
     private void callAPKTool(String[] params) {
         System.out.println("\n" + Arrays.toString(params));
@@ -58,9 +59,46 @@ public class MainClass {
     }
 
 
+
+    // read the files in parallel to finish faster (might be alot of files)
+    private void processFiles(ArrayList<SmaliFile> smaliFiles) {
+
+        // TEST
+        // smaliFiles.get(0).processLines();
+
+
+        // start the max number of threads for this machine
+        // ExecutorService service = Executors.newFixedThreadPool(2);
+        for(SmaliFile s: smaliFiles) {
+            //service.execute(s::processLines);
+            s.processLines();
+        }
+
+        // shutdown
+        // this will get blocked until all task finish
+        /*
+        service.shutdown();
+        try {
+            service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+         */
+
+
+    }
+
+    // start the obfuscation process
+    public void obfuscate() {
+        ArrayList<SmaliFile> smaliFiles = APKInfo.getInstance().getSmaliFileList();
+        processFiles(smaliFiles); // read files line by line and extract SmaliLine's (class)
+    }
+
+
     private void start() {
-        APKInfo.setApkName("timber.apk");
-        // APKInfo.setApkName("sample_navigation.apk");
+        // APKInfo.setApkName("timber.apk");
+        APKInfo.setApkName("sample_navigation.apk");
         APKInfo info = APKInfo.getInstance();
         File apkFile = info.getApkFile();
         File apkDir = info.getProjectApkDir();
@@ -69,11 +107,7 @@ public class MainClass {
         // decompileWithAPKTool(apkFile, outputDir);
         System.out.println("==== DONE DECOMPILING ====");
         // TODO: work on obfuscate
-        // StartProcess obf = new StartProcess();
-        // obf.obfuscate();
-
-
-
+        obfuscate();
         // buildWithAPKTool(outputDir);
         //signAPKWithUber(apkFile, apkDir, outputDir);
     }
