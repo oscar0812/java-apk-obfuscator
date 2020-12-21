@@ -79,12 +79,11 @@ public class SmaliLine {
             if (parts.length > 0 && parts[0].equals("const-string")) {
                 // ["const-string", "v0,", "String here"]
                 // obfuscate string
-                // SmaliLineObfuscator obf = SmaliLineObfuscator.getInstance();
-                // smaliLines.addAll(obf.stringToStaticCall(originalLine));
+                SmaliLineObfuscator obf = SmaliLineObfuscator.getInstance();
+                smaliLines.addAll(obf.stringToStaticCall(originalLine));
             } else {
-                // smaliLines.add(originalLine);
+                smaliLines.add(originalLine);
             }
-            smaliLines.add(originalLine);
 
             // check if lines reference any class within the main package
             HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getSmaliFileMap();

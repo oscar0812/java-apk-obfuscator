@@ -15,13 +15,12 @@ public class APKInfo {
     private File apkFile;
     private File apkDecompileDir;
     private File smaliDir;
-    private String manifestPackage;
 
     private SmaliFile RSmaliFile;
     private final HashMap<String, SmaliFile> smaliFileMap = new HashMap<>();
     private final ArrayList<SmaliFile> smaliFileList = new ArrayList<>();
 
-    private final ArrayList<File> mainManifestFiles = new ArrayList<>();
+    private final ArrayList<File> manifestAppFiles = new ArrayList<>();
 
     private static APKInfo instance = null;
 
@@ -77,18 +76,6 @@ public class APKInfo {
         return smaliDir;
     }
 
-    public String getManifestPackage() {
-        return manifestPackage;
-    }
-
-    public ArrayList<File> getMainManifestFiles() {
-        return mainManifestFiles;
-    }
-
-    public SmaliFile getRSmaliFile() {
-        return RSmaliFile;
-    }
-
     public HashMap<String, SmaliFile> getSmaliFileMap() {
         return smaliFileMap;
     }
@@ -110,7 +97,6 @@ public class APKInfo {
 
         assert document != null;
         Element manifestTag = document.getRootElement();
-        manifestPackage = (String) manifestTag.attribute("package").getData();
 
         Set<String> visitedFiles = new HashSet<>();
 
@@ -125,7 +111,7 @@ public class APKInfo {
                     File file = new File(smaliDir, sf);
                     if (!visitedFiles.contains(file.getAbsolutePath())) {
                         if (file.exists()) {
-                            mainManifestFiles.add(file);
+                            manifestAppFiles.add(file);
                         }
                         visitedFiles.add(file.getAbsolutePath());
                     }
@@ -137,7 +123,7 @@ public class APKInfo {
 
     private void fetchSmaliFiles() {
         // ok got the main files, now search for R.smali, that should tell us what the root directory of the apk is
-        Queue<File> q = new LinkedList<>(mainManifestFiles);
+        Queue<File> q = new LinkedList<>(manifestAppFiles);
         Set<String> visitedFiles = new HashSet<>();
 
         while (!q.isEmpty()) {
@@ -165,10 +151,17 @@ public class APKInfo {
             }
         }
 
+        assert RSmaliFile != null;
+
         // got R.smali, now get all files in smali/main_package directory
         // meh recursion, use queue
         q.clear();
         q.add(RSmaliFile.getParentFile());
+
+        // to set the smali packages
+        HashMap<String, String> pathToPackage = new HashMap<>();
+        Stack<File> packageStack = new Stack<>();
+        pathToPackage.put(smaliDir.getAbsolutePath(), ""); // base package
 
         while (!q.isEmpty()) {
             File parent = q.poll(); // retrieve and remove the first element
@@ -183,6 +176,26 @@ public class APKInfo {
                     if(file.getName().endsWith(".smali")) {
                         // append this smali file
                         SmaliFile sf = new SmaliFile(file.getAbsolutePath());
+
+                        // get package. Bubble up to known parent
+                        File bubbler = file.getParentFile();
+                        while (!pathToPackage.containsKey(bubbler.getAbsolutePath())) {
+                            packageStack.add(bubbler);
+                            bubbler = bubbler.getParentFile();
+                        }
+
+                        // Bubble down to current file and set the trail of paths
+                        StringBuilder builder = new StringBuilder(pathToPackage.get(bubbler.getAbsolutePath()));
+                        while (!packageStack.empty()) {
+                            bubbler = packageStack.pop();
+                            builder.append(bubbler.getName()).append("/");
+                            pathToPackage.put(bubbler.getAbsolutePath(), builder.toString());
+                        }
+
+                        // set package
+                        sf.setSmaliPackage("L"+builder.toString()+file.getName()+";");
+
+                        // for quick access
                         smaliFileMap.put(sf.getAbsolutePath(), sf);
                         smaliFileList.add(sf);
                     }

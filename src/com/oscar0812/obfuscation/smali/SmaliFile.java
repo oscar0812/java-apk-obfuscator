@@ -55,10 +55,6 @@ public class SmaliFile extends File {
         return smaliClass;
     }
 
-    public void setSmaliClass(String smaliClass) {
-        this.smaliClass = smaliClass;
-    }
-
     // THIS method starts the process for this file
     public void processLines() {
         // System.out.println("PROCESSING: "+getAbsolutePath());
@@ -80,20 +76,6 @@ public class SmaliFile extends File {
 
     private void processSingleLine(String text) {
         ArrayList<SmaliLine> processedLines = SmaliLine.process(text, this);
-
-        if(smaliPackage.isEmpty()) {
-            // set the package
-            // .class public Lcom/oscar0812/sample_navigation/StringUtil;
-            for(SmaliLine l: processedLines) {
-                String[] parts = l.getParts();
-                if(parts[0].equals(".class")) {
-                    setSmaliPackage(parts[parts.length-1]);
-
-                    break;
-                }
-            }
-        }
-
         lines.addAll(processedLines);
     }
 
