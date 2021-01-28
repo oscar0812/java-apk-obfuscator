@@ -25,7 +25,7 @@ public class APKInfo {
     private static APKInfo instance = null;
 
     public static APKInfo getInstance() {
-        if(instance == null) {
+        if (instance == null) {
             instance = new APKInfo();
         }
         return instance;
@@ -53,9 +53,6 @@ public class APKInfo {
 
                 // TODO: what about apks with smali/ AND smali_classes2/
                 smaliDir = new File(apkDecompileDir, "smali");
-
-                manifestFileInfo();
-                fetchSmaliFiles();
             }
         }
     }
@@ -82,6 +79,17 @@ public class APKInfo {
 
     public ArrayList<SmaliFile> getSmaliFileList() {
         return smaliFileList;
+    }
+
+    public void addSmaliFile(SmaliFile smaliFile) {
+        // quick access through path
+        smaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
+        smaliFileList.add(smaliFile);
+    }
+
+    public void fetchDecompiledInfo() {
+        manifestFileInfo();
+        fetchSmaliFiles();
     }
 
     // get android info from android manifest
@@ -131,18 +139,18 @@ public class APKInfo {
             File parent = f.getParentFile();
 
             // only visit a folder once. Don't waste time
-            if(!visitedFiles.contains(parent.getAbsolutePath())) {
+            if (!visitedFiles.contains(parent.getAbsolutePath())) {
                 // System.out.println("CHECKING: "+f.getAbsolutePath());
                 File r = new File(parent, "R.smali");
 
                 if (r.exists()) {
                     File rID = new File(parent, "R$id.smali");
                     // every R.smali comes with a R$id.smali by design
-                    if(rID.exists()) {
-                        RSmaliFile = new SmaliFile(parent,"R.smali");
+                    if (rID.exists()) {
+                        RSmaliFile = new SmaliFile(parent, "R.smali");
                         break;
                     }
-                } else if(!parent.getAbsolutePath().equals(smaliDir.getAbsolutePath())) {
+                } else if (!parent.getAbsolutePath().equals(smaliDir.getAbsolutePath())) {
                     // can still go back
                     q.add(parent.getParentFile());
                 }
@@ -167,13 +175,13 @@ public class APKInfo {
             File parent = q.poll(); // retrieve and remove the first element
             File[] files = parent.listFiles();
 
-            if(files == null) {
+            if (files == null) {
                 continue;
             }
 
             for (File file : files) {
                 if (file.isFile()) {
-                    if(file.getName().endsWith(".smali")) {
+                    if (file.getName().endsWith(".smali")) {
                         // append this smali file
                         SmaliFile sf = new SmaliFile(file.getAbsolutePath());
 
@@ -193,11 +201,8 @@ public class APKInfo {
                         }
 
                         // set package
-                        sf.setSmaliPackage("L"+builder.toString()+file.getName()+";");
-
-                        // for quick access
-                        smaliFileMap.put(sf.getAbsolutePath(), sf);
-                        smaliFileList.add(sf);
+                        sf.setSmaliPackage("L" + builder.toString() + file.getName() + ";");
+                        addSmaliFile(sf);
                     }
                 } else if (file.isDirectory()) {
                     // found directory

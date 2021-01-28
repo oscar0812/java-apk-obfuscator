@@ -1,14 +1,12 @@
 package com.oscar0812.obfuscation.smali;
 
+import com.oscar0812.obfuscation.APKInfo;
 import com.oscar0812.obfuscation.StringUtils;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class SmaliLineObfuscator {
-    // FUNCTIONS call parent->method()
-    // parent calls child->toString()
-    // SINCE the string obfuscation creates an object and messes around with bytes in it's toString() method
 
     private static SmaliLineObfuscator instance = null;
 
@@ -19,12 +17,8 @@ public class SmaliLineObfuscator {
         return instance;
     }
 
-    private final Set<String> stringsUsed = new HashSet<>();
     private final HashMap<String, SmaliFile> obfFileMap = new HashMap<>();
     private final ArrayList<String> obfFilePaths = new ArrayList<>();
-
-    // children = StringUtil$1, StringUtil$1, etc...
-    private final HashMap<String, SmaliFile> childFiles = new HashMap<>();
 
     private SmaliFile createNewFile(SmaliFile siblingFile) {
         // create a file with a name that doesn't exist in the same directory as siblingFile
@@ -46,13 +40,12 @@ public class SmaliLineObfuscator {
 
     // smali of string obfuscator object (look at StringUtil.smali)
     private SmaliFile createObfFile(SmaliLine line) {
-        SmaliFile obfFile = createNewFile(line.getInFile());
+        SmaliFile obfFile = createNewFile(line.getParentFile());
 
         obfFile.appendString(
                 ".class public " + obfFile.getSmaliPackage() + "\n" +
                         ".super Ljava/lang/Object;\n" +
                         ".source \"" + obfFile.getSmaliClass() + ".java\"\n\n\n" +
-                        "# direct methods\n" +
                         ".method public constructor <init>()V\n" +
                         "    .locals 0\n\n" +
                         "    invoke-direct {p0}, Ljava/lang/Object;-><init>()V\n\n" +
@@ -114,7 +107,7 @@ public class SmaliLineObfuscator {
 
             String indexHex = "0x" + Integer.toHexString(i);
             obfFile.appendString(
-                    "\t.line " + (obfFile.debugLine++) + "\n" +
+                    "\n\t.line " + (obfFile.debugLine++) + "\n" +
                             "\tconst v1, " + tHex + "\n\n" +
                             "\tushr-int/lit8 v2, v1, " + fHex +"\n\n" +
                             "\tint-to-byte v2, v2\n\n" +
@@ -156,9 +149,14 @@ public class SmaliLineObfuscator {
 
         // obfFile.saveToDisk();
 
-        lines.add(new SmaliLine("\tinvoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getInFile()));
-        lines.add(new SmaliLine("", line.getInFile()));
-        lines.add(new SmaliLine("\tmove-result-object " + register, line.getInFile()));
+        // add this to the apk (IT IS PART OF IT NOW!)
+        APKInfo.getInstance().addSmaliFile(obfFile);
+
+        SmaliLine smaliLine = new SmaliLine("\t\tinvoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getParentFile());
+
+        lines.add(smaliLine);
+        lines.add(new SmaliLine("", line.getParentFile()));
+        lines.add(new SmaliLine("\t\tmove-result-object " + register, line.getParentFile()));
 
         return lines;
     }

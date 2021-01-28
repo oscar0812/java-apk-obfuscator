@@ -17,6 +17,11 @@ import java.util.Arrays;
  *       3.a: brut.apktool.Main.main(args)
  *   4: sign app with uber signer
  *       4.a: at.favre.tools.apksigner.SignTool.main(args)
+ *
+ *
+ *   CONNECT TO BLUESTACKS ADB-LOGCAT:
+ *       C:\Users\oscar\AppData\Local\Android\Sdk\platform-tools\adb.exe logcat localhost:63543
+ *          63543 is the port in adb settings (gear icon -> preferences -> scroll down)
  * */
 
 
@@ -36,6 +41,8 @@ public class MainClass {
     private void decompileWithAPKTool(File apkFile, File outputDir) {
         String[] apk_decompile_params = {"d", "-f", apkFile.getAbsolutePath(), "--output", outputDir.getAbsolutePath()};
         callAPKTool(apk_decompile_params);
+        // tell apkinfo that we decompiled the apk
+        APKInfo.getInstance().fetchDecompiledInfo();
     }
 
     private void buildWithAPKTool(File outputDir) {
@@ -104,13 +111,21 @@ public class MainClass {
         File apkDir = info.getProjectApkDir();
         File outputDir = info.getApkDecompileDir();
 
-        // decompileWithAPKTool(apkFile, outputDir);
+        decompileWithAPKTool(apkFile, outputDir);
+
         System.out.println("==== DONE DECOMPILING ====");
         // TODO: work on obfuscate
+
         obfuscate();
-        // buildWithAPKTool(outputDir);
-        //signAPKWithUber(apkFile, apkDir, outputDir);
+        /*
+        buildWithAPKTool(outputDir);
+        signAPKWithUber(apkFile, apkDir, outputDir);
+         */
     }
+
+    // TODO: what about reflective methods?
+    // obfuscate xml?
+    // obfuscate assets?
 
     public static void main(String[] args) {
         MainClass m = new MainClass();

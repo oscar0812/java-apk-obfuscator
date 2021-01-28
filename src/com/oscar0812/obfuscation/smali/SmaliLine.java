@@ -1,7 +1,7 @@
 package com.oscar0812.obfuscation.smali;
 
 import com.oscar0812.obfuscation.APKInfo;
-import com.oscar0812.obfuscation.MainClass;
+import com.oscar0812.obfuscation.GlobalOptions;
 import com.oscar0812.obfuscation.StringUtils;
 
 import java.io.File;
@@ -19,13 +19,16 @@ public class SmaliLine {
     private final String originalText;
     private final String[] parts;
 
-    private final SmaliFile inFile;
+    // should this line be ignored? lines like .local and .line should be (makes it harder to understand)
+    private boolean ignore = false;
 
-    public SmaliLine(String originalText, SmaliFile inFile) {
+    private final SmaliFile parentFile;
+
+    public SmaliLine(String originalText, SmaliFile parentFile) {
         this.originalText = originalText;
 
-        assert inFile != null;
-        this.inFile = inFile;
+        assert parentFile != null;
+        this.parentFile = parentFile;
 
         String trimmed = originalText.trim();
         ArrayList<String> partList = new ArrayList<>();
@@ -44,6 +47,9 @@ public class SmaliLine {
             // nothing special? IDK, just split by spaces
             parts = trimmed.split("\\s+");
         }
+        if (parts.length > 0) {
+            this.ignore = GlobalOptions.IGNORE_START_LINES.contains(parts[0]);
+        }
     }
 
     public String getOriginalText() {
@@ -54,56 +60,72 @@ public class SmaliLine {
         return parts;
     }
 
-    public SmaliFile getInFile() {
-        return inFile;
+    public SmaliFile getParentFile() {
+        return parentFile;
     }
 
     public boolean isEmpty() {
         return originalText.trim().isEmpty();
     }
 
-    private static boolean ignoreLine(String text) {
-        String trimmed = text.trim();
-        boolean ignore = MainClass.REMOVE_DOT_LINE && trimmed.startsWith(".line");
-
-        return ignore;
-    }
-
     // 1 line of text can become nothing (if ignored) or multiple lines (i.e, reflection makes multiple lines)
     public static ArrayList<SmaliLine> process(String text, SmaliFile inFile) {
         SmaliLine originalLine = new SmaliLine(text, inFile);
         ArrayList<SmaliLine> smaliLines = new ArrayList<>();
+
         // some lines should be ignored
-        if (!ignoreLine(text)) {
-            String[] parts = originalLine.getParts();
-            if (parts.length > 0 && parts[0].equals("const-string")) {
-                // ["const-string", "v0,", "String here"]
-                // obfuscate string
-                SmaliLineObfuscator obf = SmaliLineObfuscator.getInstance();
-                smaliLines.addAll(obf.stringToStaticCall(originalLine));
-            } else {
-                smaliLines.add(originalLine);
-            }
+        if (originalLine.ignore) {
+            return smaliLines;
+        }
 
-            // check if lines reference any class within the main package
-            HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getSmaliFileMap();
-            for (SmaliLine smaliLine : smaliLines) {
-                File smaliDir = APKInfo.getInstance().getSmaliDir();
-                for (String s : StringUtils.getSmaliClassSubstrings(text)) {
-                    // remove L and ;
-                    String subpath = s.substring(1, s.length() - 1);
-                    File referencedFile = new File(smaliDir, subpath + ".smali");
+        String[] parts = originalLine.getParts();
+        if (parts.length > 0 && parts[0].equals("const-string")) {
+            // ["const-string", "v0,", "String here"]
+            // obfuscate string
+            SmaliLineObfuscator obf = SmaliLineObfuscator.getInstance();
+            smaliLines.addAll(obf.stringToStaticCall(originalLine));
+        } else {
+            smaliLines.add(originalLine);
+        }
 
-                    if (smaliFileMap.containsKey(referencedFile.getAbsolutePath())) {
-                        // referenced class is in main package (I don't want to obfuscate ALL files including libs)
-                        smaliFileMap.get(referencedFile.getAbsolutePath()).addReferenceLine(smaliLine);
-                    }
+        // check if lines reference any class within the main package
+        HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getSmaliFileMap();
+        File smaliDir = APKInfo.getInstance().getSmaliDir();
+        for (SmaliLine smaliLine : smaliLines) {
+            for (String s : StringUtils.getSmaliClassSubstrings(text)) {
+                // remove L and ;
+                String subpath = s.substring(1, s.length() - 1);
+                File referencedFile = new File(smaliDir, subpath + ".smali");
+
+                if (smaliFileMap.containsKey(referencedFile.getAbsolutePath())) {
+                    // referenced class is in main package (I don't want to obfuscate ALL files including libs)
+                    smaliFileMap.get(referencedFile.getAbsolutePath()).addReferenceSmaliLine(smaliLine);
                 }
             }
+
+            // check if this line is part of a method (parent files method)
+            ArrayList<SmaliMethod> childMethodList = inFile.getChildMethodList();
+            HashMap<String, ArrayList<SmaliMethod>> childMethodMap = inFile.getChildMethodMap();
+
+            if(parts[0].equals(".method")) {
+                // start of a method
+                SmaliMethod sm = new SmaliMethod(inFile, smaliLine);
+                childMethodList.add(sm);
+
+                // update the hashmap, to search for method faster by name
+                if(!childMethodMap.containsKey(sm.getMethodName())) {
+                    childMethodMap.put(sm.getMethodName(), new ArrayList<>());
+                }
+                childMethodMap.get(sm.getMethodName()).add(sm);
+
+            } else if (childMethodList.size() > 0 && !childMethodList.get(childMethodList.size()-1).isEnded()) {
+                // this line is part of a method
+                childMethodList.get(childMethodList.size()-1).appendChildLine(smaliLine);
+            }
+
+            inFile.getChildLines().add(smaliLine);
         }
 
         return smaliLines;
     }
-
-
 }

@@ -4,14 +4,18 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Scanner;
 
 public class SmaliFile extends File {
-    private final ArrayList<SmaliLine> lines = new ArrayList<>();
-    // what lines in other files reference/link/use this file
+    private final ArrayList<SmaliLine> childLines = new ArrayList<>();
+    // what lines reference/link/use this file
     private final ArrayList<SmaliLine> referencedInlines = new ArrayList<>();
     private String smaliPackage = "";
     private String smaliClass = "";
+
+    private final ArrayList<SmaliMethod> childMethodList = new ArrayList<>();
+    private final HashMap<String, ArrayList<SmaliMethod>> childMethodMap = new HashMap<>(); // link method name to method object
 
     public long debugLine = 50;
 
@@ -23,21 +27,21 @@ public class SmaliFile extends File {
         super(parent, child);
     }
 
-    public ArrayList<SmaliLine> getLines() {
-        return lines;
+    public ArrayList<SmaliLine> getChildLines() {
+        return childLines;
     }
 
-    public ArrayList<SmaliLine> getReferencedInlines() {
+    public ArrayList<SmaliLine> getReferencedInSmaliLines() {
         return referencedInlines;
     }
 
-    public void addReferenceLine(SmaliLine inLine) {
+    public void addReferenceSmaliLine(SmaliLine inLine) {
         referencedInlines.add(inLine);
     }
 
     public void appendString(String text) {
-        for(String s: text.split("\\r?\\n|\\r")) { // split text by new line
-            processSingleLine(s);
+        for (String s : text.split("\\r?\\n|\\r")) { // split text by new line
+            SmaliLine.process(s, this);
         }
     }
 
@@ -48,7 +52,7 @@ public class SmaliFile extends File {
     // setting the package, so override the class
     public void setSmaliPackage(String smaliPackage) {
         this.smaliPackage = smaliPackage; // Lcom/oscar0812/sample_navigation/StringUtil;
-        this.smaliClass = smaliPackage.substring(smaliPackage.lastIndexOf("/") + 1, smaliPackage.length()-1); // StringUtil
+        this.smaliClass = smaliPackage.substring(smaliPackage.lastIndexOf("/") + 1, smaliPackage.length() - 1); // StringUtil
     }
 
     public String getSmaliClass() {
@@ -60,32 +64,26 @@ public class SmaliFile extends File {
         // System.out.println("PROCESSING: "+getAbsolutePath());
         // read file line by line
         try (Scanner scanner = new Scanner(new File(getAbsolutePath()))) {
-            while (scanner.hasNext()){
-                // check if line is valid
+            while (scanner.hasNext()) {
                 String line = scanner.nextLine();
-                processSingleLine(line);
+                SmaliLine.process(line, this);
             }
 
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        // saveToDisk();
+        saveToDisk();
         // System.out.println("PROCESSED: "+getAbsolutePath());
-    }
-
-    private void processSingleLine(String text) {
-        ArrayList<SmaliLine> processedLines = SmaliLine.process(text, this);
-        lines.addAll(processedLines);
     }
 
     public void saveToDisk() {
         try {
-            if(exists() || createNewFile()) {
+            if (exists() || createNewFile()) {
 
-                FileWriter writer = new FileWriter(new File(getAbsolutePath()), false);
+                FileWriter writer = new FileWriter(getAbsolutePath(), false);
 
-                for (SmaliLine line : lines) {
+                for (SmaliLine line : childLines) {
                     writer.write(line.getOriginalText());
                     writer.write("\n");
                     if (line.getParts()[0].equals(".end")) {
@@ -95,11 +93,19 @@ public class SmaliFile extends File {
 
                 writer.close();
             } else {
-                System.out.println("COULDN'T CREATE FILE: "+getAbsolutePath());
+                System.out.println("COULDN'T CREATE FILE: " + getAbsolutePath());
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
 
+    }
+
+    public ArrayList<SmaliMethod> getChildMethodList() {
+        return childMethodList;
+    }
+
+    public HashMap<String, ArrayList<SmaliMethod>> getChildMethodMap() {
+        return childMethodMap;
     }
 }
