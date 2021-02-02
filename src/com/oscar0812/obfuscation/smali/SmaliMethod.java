@@ -23,10 +23,6 @@ public class SmaliMethod {
         childLines.add(firstLine);
 
         String[] parts = firstLine.getParts();
-        if (!parts[0].equals(".method")) {
-            System.out.println("Not a method start: " + firstLine.getOriginalText());
-            return;
-        }
 
         this.accessSpecifier = parts[1];
         this.isConstructor = parts[2].equals("constructor");

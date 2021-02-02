@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 
 /*
  * STEPS:
@@ -65,41 +66,19 @@ public class MainClass {
         at.favre.tools.apksigner.SignTool.main(sign_params);
     }
 
-
-
-    // read the files in parallel to finish faster (might be alot of files)
+    // TODO: read the files in parallel to finish faster (might be alot of files)
     private void processFiles(ArrayList<SmaliFile> smaliFiles) {
-
-        // TEST
-        // smaliFiles.get(0).processLines();
-
-
-        // start the max number of threads for this machine
-        // ExecutorService service = Executors.newFixedThreadPool(2);
         for(SmaliFile s: smaliFiles) {
             //service.execute(s::processLines);
             s.processLines();
         }
-
-        // shutdown
-        // this will get blocked until all task finish
-        /*
-        service.shutdown();
-        try {
-            service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-         */
-
 
     }
 
     // start the obfuscation process
     public void obfuscate() {
         ArrayList<SmaliFile> smaliFiles = APKInfo.getInstance().getSmaliFileList();
-        processFiles(smaliFiles); // read files line by line and extract SmaliLine's (class)
+        processFiles(new ArrayList<>(smaliFiles)); // read files line by line and extract SmaliLine's (class)
     }
 
 

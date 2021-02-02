@@ -1,5 +1,6 @@
 package com.oscar0812.obfuscation;
 
+import com.oscar0812.obfuscation.res.ResourceInfo;
 import com.oscar0812.obfuscation.smali.SmaliFile;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
@@ -14,13 +15,14 @@ public class APKInfo {
     private final File projectApkDir;
     private File apkFile;
     private File apkDecompileDir;
-    private File smaliDir;
+    private File smaliDir, resDir;
 
     private SmaliFile RSmaliFile;
     private final HashMap<String, SmaliFile> smaliFileMap = new HashMap<>();
     private final ArrayList<SmaliFile> smaliFileList = new ArrayList<>();
 
-    private final ArrayList<File> manifestAppFiles = new ArrayList<>();
+    private final ArrayList<File> manifestAppFileList = new ArrayList<>();
+    private final HashMap<String, File> manifestAppFileMap = new HashMap<>();
 
     private static APKInfo instance = null;
 
@@ -31,12 +33,13 @@ public class APKInfo {
         return instance;
     }
 
-    public static void setApkName(String inName) {
+    public static APKInfo setApkName(String inName) {
         apkName = inName;
         instance = new APKInfo();
+        return instance;
     }
 
-    public APKInfo() {
+    private APKInfo() {
         // apk has to be in apks/ folder
         projectApkDir = new File(System.getProperty("user.dir") + File.separator + "apks");
         if (!projectApkDir.exists()) {
@@ -53,6 +56,7 @@ public class APKInfo {
 
                 // TODO: what about apks with smali/ AND smali_classes2/
                 smaliDir = new File(apkDecompileDir, "smali");
+                resDir = new File(apkDecompileDir, "res");
             }
         }
     }
@@ -73,6 +77,10 @@ public class APKInfo {
         return smaliDir;
     }
 
+    public File getResDir() {
+        return resDir;
+    }
+
     public HashMap<String, SmaliFile> getSmaliFileMap() {
         return smaliFileMap;
     }
@@ -83,12 +91,15 @@ public class APKInfo {
 
     public void addSmaliFile(SmaliFile smaliFile) {
         // quick access through path
-        smaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
-        smaliFileList.add(smaliFile);
+        if(!this.smaliFileMap.containsKey(smaliFile.getAbsolutePath())) {
+            this.smaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
+            this.smaliFileList.add(smaliFile);
+        }
     }
 
     public void fetchDecompiledInfo() {
         manifestFileInfo();
+        ResourceInfo.getInstance(); // start a resource info instance
         fetchSmaliFiles();
     }
 
@@ -119,7 +130,8 @@ public class APKInfo {
                     File file = new File(smaliDir, sf);
                     if (!visitedFiles.contains(file.getAbsolutePath())) {
                         if (file.exists()) {
-                            manifestAppFiles.add(file);
+                            manifestAppFileList.add(file);
+                            manifestAppFileMap.put(file.getAbsolutePath(), file);
                         }
                         visitedFiles.add(file.getAbsolutePath());
                     }
@@ -131,7 +143,7 @@ public class APKInfo {
 
     private void fetchSmaliFiles() {
         // ok got the main files, now search for R.smali, that should tell us what the root directory of the apk is
-        Queue<File> q = new LinkedList<>(manifestAppFiles);
+        Queue<File> q = new LinkedList<>(manifestAppFileList);
         Set<String> visitedFiles = new HashSet<>();
 
         while (!q.isEmpty()) {

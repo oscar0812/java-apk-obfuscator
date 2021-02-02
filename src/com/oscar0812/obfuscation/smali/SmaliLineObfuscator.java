@@ -153,7 +153,7 @@ public class SmaliLineObfuscator {
         APKInfo.getInstance().addSmaliFile(obfFile);
 
         SmaliLine smaliLine = new SmaliLine("\t\tinvoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getParentFile());
-
+        obfFile.addReferenceSmaliLine(smaliLine);
         lines.add(smaliLine);
         lines.add(new SmaliLine("", line.getParentFile()));
         lines.add(new SmaliLine("\t\tmove-result-object " + register, line.getParentFile()));

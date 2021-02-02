@@ -90,6 +90,11 @@ public class SmaliLine {
 
         // check if lines reference any class within the main package
         HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getSmaliFileMap();
+
+        // check if this line is part of a method (parent files method)
+        ArrayList<SmaliMethod> childMethodList = inFile.getChildMethodList();
+        HashMap<String, ArrayList<SmaliMethod>> childMethodMap = inFile.getChildMethodMap();
+
         File smaliDir = APKInfo.getInstance().getSmaliDir();
         for (SmaliLine smaliLine : smaliLines) {
             for (String s : StringUtils.getSmaliClassSubstrings(text)) {
@@ -102,10 +107,6 @@ public class SmaliLine {
                     smaliFileMap.get(referencedFile.getAbsolutePath()).addReferenceSmaliLine(smaliLine);
                 }
             }
-
-            // check if this line is part of a method (parent files method)
-            ArrayList<SmaliMethod> childMethodList = inFile.getChildMethodList();
-            HashMap<String, ArrayList<SmaliMethod>> childMethodMap = inFile.getChildMethodMap();
 
             if(parts[0].equals(".method")) {
                 // start of a method
@@ -127,5 +128,15 @@ public class SmaliLine {
         }
 
         return smaliLines;
+    }
+
+    @Override
+    public String toString() {
+        return "SmaliLine{" +
+                "originalText='" + originalText + '\'' +
+                ", parts=" + Arrays.toString(parts) +
+                ", ignore=" + ignore +
+                ", parentFile=" + parentFile +
+                '}';
     }
 }
