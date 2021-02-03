@@ -1,47 +1,53 @@
 package com.oscar0812.obfuscation.smali;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class SmaliMethod {
-
+    private boolean ended;
     private final SmaliFile parentFile;
     private final ArrayList<SmaliLine> childLines;
 
-    private boolean isConstructor;
-    private String accessSpecifier;
-    private String methodName;
-    private String[] methodParameters; // how to hold parameters? just like this for now
-    private String methodReturnType;
+    private boolean isConstructor = false;
+    private String[] accessSpecifiers = null;
+    private final String methodName;
+    private final String[] methodParameters; // how to hold parameters? just like this for now
+    private final String methodReturnType;
 
-    private boolean ended; // reached ".end method" line
+    // onCreate(Landroid/os/Bundle;)V
+    private final String shortMethodIdentifier;
 
     // parentFile is the file which this method resides: onCreate()'s parentFile is MainActivity.smali
     // firstLine: .method protected onCreate(Landroid/os/Bundle;)V
     public SmaliMethod(SmaliFile parentFile, SmaliLine firstLine) {
         this.parentFile = parentFile;
         childLines = new ArrayList<>();
-        childLines.add(firstLine);
+        this.childLines.add(firstLine);
 
         String[] parts = firstLine.getParts();
 
-        this.accessSpecifier = parts[1];
-        this.isConstructor = parts[2].equals("constructor");
+        // "default" access modifier: .method mName()V
+        if(parts.length > 2) {
+            // ["public"], ["public", "static", "final"], ["private"], etc..
+            this.accessSpecifiers = Arrays.copyOfRange(parts, 1, parts.length-1);
+            this.isConstructor = accessSpecifiers[accessSpecifiers.length-1].equals("constructor");
+        }
 
-        // onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;
-        String lastPart = parts[parts.length - 1];
+        // onCreate(Landroid/os/Bundle;)V
+        this.shortMethodIdentifier = parts[parts.length - 1];
 
-        this.methodName = lastPart.substring(0, lastPart.indexOf("("));
+        this.methodName = shortMethodIdentifier.substring(0, shortMethodIdentifier.indexOf("("));
 
         // get string in (...)
-        int firstBracket = lastPart.indexOf('(');
+        int firstBracket = shortMethodIdentifier.indexOf('(');
         // Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;
-        String contents = lastPart.substring(firstBracket + 1, lastPart.indexOf(')', firstBracket));
+        String contents = shortMethodIdentifier.substring(firstBracket + 1, shortMethodIdentifier.indexOf(')', firstBracket));
         // ["Landroid/view/LayoutInflater", "Landroid/view/ViewGroup", "Landroid/os/Bundle"]
         this.methodParameters = contents.split(";");
 
         // the return is after the )
         // Landroid/view/View
-        this.methodReturnType = lastPart.substring(lastPart.indexOf(")") + 1, lastPart.length() - 1);
+        this.methodReturnType = shortMethodIdentifier.substring(shortMethodIdentifier.indexOf(")") + 1, shortMethodIdentifier.length() - 1);
     }
 
     public void appendChildLine(SmaliLine smaliLine) {
@@ -55,10 +61,6 @@ public class SmaliMethod {
         }
     }
 
-    public SmaliFile getParentFile() {
-        return parentFile;
-    }
-
     public ArrayList<SmaliLine> getChildLines() {
         return childLines;
     }
@@ -67,8 +69,8 @@ public class SmaliMethod {
         return isConstructor;
     }
 
-    public String getAccessSpecifier() {
-        return accessSpecifier;
+    public String[] getAccessSpecifiers() {
+        return accessSpecifiers;
     }
 
     public String getMethodName() {
@@ -85,5 +87,13 @@ public class SmaliMethod {
 
     public boolean isEnded() {
         return ended;
+    }
+
+    public SmaliFile getParentFile() {
+        return parentFile;
+    }
+
+    public String getShortMethodIdentifier() {
+        return shortMethodIdentifier;
     }
 }

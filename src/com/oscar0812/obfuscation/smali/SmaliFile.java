@@ -14,8 +14,13 @@ public class SmaliFile extends File {
     private String smaliPackage = "";
     private String smaliClass = "";
 
+    // field lines
+    private final ArrayList<SmaliField> childFieldList = new ArrayList<>();
+    private final HashMap<String, SmaliField> childFieldMap = new HashMap<>();
+
+    // method blocks
     private final ArrayList<SmaliMethod> childMethodList = new ArrayList<>();
-    private final HashMap<String, ArrayList<SmaliMethod>> childMethodMap = new HashMap<>(); // link method name to method object
+    private final HashMap<String, SmaliMethod> childMethodMap = new HashMap<>(); // link method name to method object
 
     public long debugLine = 50;
 
@@ -77,6 +82,28 @@ public class SmaliFile extends File {
         // System.out.println("PROCESSED: "+getAbsolutePath());
     }
 
+    public void addFieldLine(SmaliLine smaliLine) {
+        SmaliField sf = new SmaliField(smaliLine);
+        childFieldList.add(sf);
+        childFieldMap.put(sf.getFullField(), sf);
+    }
+
+    public void addMethodLine(SmaliLine smaliLine) {
+        String[] parts = smaliLine.getParts();
+        if(parts[0].equals(".method")) {
+            // start of a method
+            SmaliMethod sm = new SmaliMethod(this, smaliLine);
+            childMethodList.add(sm);
+
+            // update the hashmap, to search for method faster by name
+            childMethodMap.put(sm.getShortMethodIdentifier(), sm);
+
+        } else if (childMethodList.size() > 0 && !childMethodList.get(childMethodList.size()-1).isEnded()) {
+            // this line is part of a method
+            childMethodList.get(childMethodList.size()-1).appendChildLine(smaliLine);
+        }
+    }
+
     public void saveToDisk() {
         try {
             if (exists() || createNewFile()) {
@@ -105,7 +132,7 @@ public class SmaliFile extends File {
         return childMethodList;
     }
 
-    public HashMap<String, ArrayList<SmaliMethod>> getChildMethodMap() {
+    public HashMap<String, SmaliMethod> getChildMethodMap() {
         return childMethodMap;
     }
 }

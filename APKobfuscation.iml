@@ -20,6 +20,5 @@
         <SOURCES />
       </library>
     </orderEntry>
-    <orderEntry type="library" name="org.apache.directory.studio:org.apache.commons.lang:2.6" level="application" />
   </component>
 </module>

@@ -212,8 +212,11 @@ public class APKInfo {
                             pathToPackage.put(bubbler.getAbsolutePath(), builder.toString());
                         }
 
+                        int index = file.getName().lastIndexOf(".smali");
+                        String withoutExt = file.getName().substring(0, index);
+
                         // set package
-                        sf.setSmaliPackage("L" + builder.toString() + file.getName() + ";");
+                        sf.setSmaliPackage("L" + builder.toString() + withoutExt + ";");
                         addSmaliFile(sf);
                     }
                 } else if (file.isDirectory()) {

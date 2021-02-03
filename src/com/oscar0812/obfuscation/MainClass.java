@@ -28,7 +28,6 @@ import java.util.Collection;
 
 
 public class MainClass {
-    public static final boolean REMOVE_DOT_LINE = false;
 
     private void callAPKTool(String[] params) {
         System.out.println("\n" + Arrays.toString(params));
@@ -83,8 +82,8 @@ public class MainClass {
 
 
     private void start() {
-        // APKInfo.setApkName("timber.apk");
-        APKInfo.setApkName("sample_navigation.apk");
+        APKInfo.setApkName("timber.apk");
+        // APKInfo.setApkName("sample_navigation.apk");
         APKInfo info = APKInfo.getInstance();
         File apkFile = info.getApkFile();
         File apkDir = info.getProjectApkDir();

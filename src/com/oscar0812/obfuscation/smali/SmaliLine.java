@@ -1,7 +1,6 @@
 package com.oscar0812.obfuscation.smali;
 
 import com.oscar0812.obfuscation.APKInfo;
-import com.oscar0812.obfuscation.GlobalOptions;
 import com.oscar0812.obfuscation.StringUtils;
 
 import java.io.File;
@@ -16,6 +15,8 @@ import java.util.*;
  */
 
 public class SmaliLine {
+    public static final Set<String> IGNORE_START_LINES = new HashSet<>(Arrays.asList(".line", ".local", ".param", "#"));
+
     private final String originalText;
     private final String[] parts;
 
@@ -48,7 +49,7 @@ public class SmaliLine {
             parts = trimmed.split("\\s+");
         }
         if (parts.length > 0) {
-            this.ignore = GlobalOptions.IGNORE_START_LINES.contains(parts[0]);
+            this.ignore = SmaliLine.IGNORE_START_LINES.contains(parts[0]);
         }
     }
 
@@ -91,10 +92,6 @@ public class SmaliLine {
         // check if lines reference any class within the main package
         HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getSmaliFileMap();
 
-        // check if this line is part of a method (parent files method)
-        ArrayList<SmaliMethod> childMethodList = inFile.getChildMethodList();
-        HashMap<String, ArrayList<SmaliMethod>> childMethodMap = inFile.getChildMethodMap();
-
         File smaliDir = APKInfo.getInstance().getSmaliDir();
         for (SmaliLine smaliLine : smaliLines) {
             for (String s : StringUtils.getSmaliClassSubstrings(text)) {
@@ -108,20 +105,12 @@ public class SmaliLine {
                 }
             }
 
-            if(parts[0].equals(".method")) {
-                // start of a method
-                SmaliMethod sm = new SmaliMethod(inFile, smaliLine);
-                childMethodList.add(sm);
+            // check if this line is part of a block (method, annotation, etc)
+            inFile.addMethodLine(smaliLine);
 
-                // update the hashmap, to search for method faster by name
-                if(!childMethodMap.containsKey(sm.getMethodName())) {
-                    childMethodMap.put(sm.getMethodName(), new ArrayList<>());
-                }
-                childMethodMap.get(sm.getMethodName()).add(sm);
-
-            } else if (childMethodList.size() > 0 && !childMethodList.get(childMethodList.size()-1).isEnded()) {
-                // this line is part of a method
-                childMethodList.get(childMethodList.size()-1).appendChildLine(smaliLine);
+            // check if this line is a field
+            if(smaliLine.getParts()[0].equals(".field")) {
+                inFile.addFieldLine(smaliLine);
             }
 
             inFile.getChildLines().add(smaliLine);
