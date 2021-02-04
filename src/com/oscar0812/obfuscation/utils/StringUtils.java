@@ -1,7 +1,6 @@
-package com.oscar0812.obfuscation;
+package com.oscar0812.obfuscation.utils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -37,8 +36,8 @@ public class StringUtils {
 
     // value = Lcom/oscar0812/sample_navigation/MainActivity;->onCreate(Landroid/os/Bundle;)V
     // => ["Lcom/oscar0812/sample_navigation/MainActivity;", "Landroid/os/Bundle;"]
-    public static ArrayList<String> getSmaliClassSubstrings(String input) {
-        ArrayList<String> list = new ArrayList<>();
+    public static ArrayList<Substring> getSmaliClassSubstrings(String input) {
+        ArrayList<Substring> list = new ArrayList<>();
 
         if (!input.contains("L") || !input.contains(";")) {
             // avoid headache's, there's nothing here
@@ -48,18 +47,37 @@ public class StringUtils {
         int from = 0;
         int indL = input.indexOf('L', from);
         while (indL >= 0) {
-            if (indL == 0 || !Character.isLetterOrDigit(input.charAt(indL - 1))) {
-                // L can't have a alphanum character before it
-                // + 1 to include ;
-                int indC = input.indexOf(';', indL + 1);
-                if (indC > 0) {
-                    list.add(input.substring(indL, indC + 1));
-                }
+            // + 1 to include ;
+            int indC = input.indexOf(';', indL + 1);
+            if (indC > 0) {
+                list.add(new Substring(indL, indC+1, input.substring(indL, indC + 1)));
             }
+
             from = indL + 1;
             indL = input.indexOf('L', from);
         }
 
         return list;
+    }
+
+    public static String getLeadingWhitespace(String text) {
+        StringBuilder wsb = new StringBuilder();
+        for (char c: text.toCharArray()) {
+            if(Character.isWhitespace(c)) {
+                wsb.append(c);
+            }
+        }
+        return wsb.toString();
+    }
+
+    public static ArrayList<Integer> getIndicesOf(String text, String c) {
+        int index = text.indexOf(c);
+        ArrayList<Integer> indices = new ArrayList<>();
+        while (index>= 0) {
+            indices.add(index);
+            index = text.indexOf(c, index+1);
+        }
+
+        return indices;
     }
 }

@@ -1,7 +1,8 @@
 package com.oscar0812.obfuscation.smali;
 
 import com.oscar0812.obfuscation.APKInfo;
-import com.oscar0812.obfuscation.StringUtils;
+import com.oscar0812.obfuscation.utils.StringUtils;
+import com.oscar0812.obfuscation.utils.Substring;
 
 import java.io.File;
 import java.util.*;
@@ -15,23 +16,36 @@ import java.util.*;
  */
 
 public class SmaliLine {
+    public static final String SINGLE_SPACE = "    ";
+    public static final String DOUBLE_SPACE = "        ";
+    public static final String TRIPLE_SPACE = "            ";
+
     public static final Set<String> IGNORE_START_LINES = new HashSet<>(Arrays.asList(".line", ".local", ".param", "#"));
 
-    private final String originalText;
-    private final String[] parts;
+    private String text;
+    private String whitespace; // how much whitespace is at the beg of text
+
+    private String[] parts;
 
     // should this line be ignored? lines like .local and .line should be (makes it harder to understand)
     private boolean ignore = false;
 
     private final SmaliFile parentFile;
 
-    public SmaliLine(String originalText, SmaliFile parentFile) {
-        this.originalText = originalText;
+    // what files this line points to
+    private final ArrayList<SmaliFile> referenceSmaliFileList = new ArrayList<>();
+    private final HashMap<String, SmaliFile> referenceSmaliFileMap = new HashMap<>();
 
-        assert parentFile != null;
+    public SmaliLine(String text, SmaliFile parentFile) {
         this.parentFile = parentFile;
+        setText(text);
+    }
 
-        String trimmed = originalText.trim();
+    public void setText(String text) {
+        this.text = text;
+        this.whitespace = StringUtils.getLeadingWhitespace(text);
+
+        String trimmed = text.trim();
         ArrayList<String> partList = new ArrayList<>();
         if (trimmed.startsWith("const-string")) {
             // break into pieces, but everything in "" stays together
@@ -53,8 +67,12 @@ public class SmaliLine {
         }
     }
 
-    public String getOriginalText() {
-        return originalText;
+    public String getText() {
+        return text;
+    }
+
+    public String getWhitespace() {
+        return whitespace;
     }
 
     public String[] getParts() {
@@ -65,8 +83,21 @@ public class SmaliLine {
         return parentFile;
     }
 
+    public ArrayList<SmaliFile> getReferenceSmaliFileList() {
+        return referenceSmaliFileList;
+    }
+
+    public HashMap<String, SmaliFile> getReferenceSmaliFileMap() {
+        return referenceSmaliFileMap;
+    }
+
+    public void addReferenceSmaliFile(SmaliFile smaliFile) {
+        referenceSmaliFileList.add(smaliFile);
+        referenceSmaliFileMap.put(smaliFile.getSmaliPackage(), smaliFile);
+    }
+
     public boolean isEmpty() {
-        return originalText.trim().isEmpty();
+        return text.trim().isEmpty();
     }
 
     // 1 line of text can become nothing (if ignored) or multiple lines (i.e, reflection makes multiple lines)
@@ -93,17 +124,48 @@ public class SmaliLine {
         HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getSmaliFileMap();
 
         File smaliDir = APKInfo.getInstance().getSmaliDir();
+        // sget-object v2, Lcom/naman14/timber/helpers/MusicPlaybackTrack;->CREATOR:Landroid/os/Parcelable$Creator;
         for (SmaliLine smaliLine : smaliLines) {
-            for (String s : StringUtils.getSmaliClassSubstrings(text)) {
+            ArrayList<Substring> substrings = StringUtils.getSmaliClassSubstrings(text);
+            // check if this lines references fields or methods
+            int arrowIndex = smaliLine.getText().indexOf("->");
+
+            // Lcom/naman14/timber/helpers/MusicPlaybackTrack;
+            for (Substring ss : substrings) {
                 // remove L and ;
-                String subpath = s.substring(1, s.length() - 1);
+                String subpath = ss.getText().substring(1, ss.getText().length() - 1);
                 File referencedFile = new File(smaliDir, subpath + ".smali");
 
                 if (smaliFileMap.containsKey(referencedFile.getAbsolutePath())) {
                     // referenced class is in main package (I don't want to obfuscate ALL files including libs)
-                    smaliFileMap.get(referencedFile.getAbsolutePath()).addReferenceSmaliLine(smaliLine);
+                    SmaliFile referenced = smaliFileMap.get(referencedFile.getAbsolutePath());
+                    referenced.addReferenceSmaliLine(smaliLine);
+                    smaliLine.addReferenceSmaliFile(referenced);
+
+                    // // CREATOR:Landroid/os/Parcelable$Creator;
+                    if(ss.getEndIndex() == arrowIndex) {
+                        // REFERENCE TO METHOD OR FIELD!!
+                        String referenceTo = smaliLine.getText().substring(arrowIndex+2);
+                        HashMap<String, ArrayList<SmaliLine>> storedRef;
+
+                        if(referenceTo.contains("(") && referenceTo.contains(")")) {
+                            // method
+                            storedRef = smaliLine.getParentFile().getMethodReferences();
+                        } else {
+                            // field
+                            storedRef = smaliLine.getParentFile().getFieldReferences();
+                        }
+
+                        if(!storedRef.containsKey(referenceTo)) {
+                            storedRef.put(referenceTo, new ArrayList<>());
+                        }
+                        storedRef.get(referenceTo).add(smaliLine);
+
+                        int a = 1;
+                    }
                 }
             }
+
 
             // check if this line is part of a block (method, annotation, etc)
             inFile.addMethodLine(smaliLine);
@@ -122,7 +184,7 @@ public class SmaliLine {
     @Override
     public String toString() {
         return "SmaliLine{" +
-                "originalText='" + originalText + '\'' +
+                "originalText='" + text + '\'' +
                 ", parts=" + Arrays.toString(parts) +
                 ", ignore=" + ignore +
                 ", parentFile=" + parentFile +

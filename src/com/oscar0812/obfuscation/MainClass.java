@@ -95,6 +95,7 @@ public class MainClass {
         // TODO: work on obfuscate
 
         obfuscate();
+        int a = 1;
         /*
         buildWithAPKTool(outputDir);
         signAPKWithUber(apkFile, apkDir, outputDir);

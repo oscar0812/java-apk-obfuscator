@@ -22,6 +22,9 @@ public class SmaliFile extends File {
     private final ArrayList<SmaliMethod> childMethodList = new ArrayList<>();
     private final HashMap<String, SmaliMethod> childMethodMap = new HashMap<>(); // link method name to method object
 
+    private final HashMap<String, ArrayList<SmaliLine>> methodReferences = new HashMap<>(); // link method name to lines that reference it
+    private final HashMap<String, ArrayList<SmaliLine>> fieldReferences = new HashMap<>();  // link field name to lines that reference it
+
     public long debugLine = 50;
 
     public SmaliFile(String pathname) {
@@ -111,7 +114,7 @@ public class SmaliFile extends File {
                 FileWriter writer = new FileWriter(getAbsolutePath(), false);
 
                 for (SmaliLine line : childLines) {
-                    writer.write(line.getOriginalText());
+                    writer.write(line.getText());
                     writer.write("\n");
                     if (line.getParts()[0].equals(".end")) {
                         writer.write("\n");
@@ -134,5 +137,21 @@ public class SmaliFile extends File {
 
     public HashMap<String, SmaliMethod> getChildMethodMap() {
         return childMethodMap;
+    }
+
+    public ArrayList<SmaliField> getChildFieldList() {
+        return childFieldList;
+    }
+
+    public HashMap<String, SmaliField> getChildFieldMap() {
+        return childFieldMap;
+    }
+
+    public HashMap<String, ArrayList<SmaliLine>> getMethodReferences() {
+        return methodReferences;
+    }
+
+    public HashMap<String, ArrayList<SmaliLine>> getFieldReferences() {
+        return fieldReferences;
     }
 }

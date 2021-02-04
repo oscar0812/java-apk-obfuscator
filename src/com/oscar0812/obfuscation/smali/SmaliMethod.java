@@ -57,7 +57,7 @@ public class SmaliMethod {
         if (ps[0].equals(".end") && ps[1].equals("method")) {
             this.ended = true;
         } else if (ended) {
-            System.out.println("You are appending to an already ended method! " + smaliLine.getOriginalText());
+            System.out.println("You are appending to an already ended method! " + smaliLine.getText());
         }
     }
 

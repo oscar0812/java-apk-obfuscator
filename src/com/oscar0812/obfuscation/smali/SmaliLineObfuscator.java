@@ -1,7 +1,7 @@
 package com.oscar0812.obfuscation.smali;
 
 import com.oscar0812.obfuscation.APKInfo;
-import com.oscar0812.obfuscation.StringUtils;
+import com.oscar0812.obfuscation.utils.StringUtils;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -47,9 +47,9 @@ public class SmaliLineObfuscator {
                         ".super Ljava/lang/Object;\n" +
                         ".source \"" + obfFile.getSmaliClass() + ".java\"\n\n\n" +
                         ".method public constructor <init>()V\n" +
-                        "    .locals 0\n\n" +
-                        "    invoke-direct {p0}, Ljava/lang/Object;-><init>()V\n\n" +
-                        "    return-void\n" +
+                        SmaliLine.SINGLE_SPACE + ".locals 0\n\n" +
+                        SmaliLine.SINGLE_SPACE + "invoke-direct {p0}, Ljava/lang/Object;-><init>()V\n\n" +
+                        SmaliLine.SINGLE_SPACE + "return-void\n" +
                         ".end method\n\n");
 
         obfFilePaths.add(obfFile.getAbsolutePath());
@@ -78,15 +78,15 @@ public class SmaliLineObfuscator {
     private void appendMethod(SmaliFile obfFile, SmaliLine smaliLine, String methodName) {
 
         obfFile.appendString(
-                ".method public static "+methodName+"()Ljava/lang/String;\n" +
-                "\t.locals 4\n\n");
+                ".method public static " + methodName + "()Ljava/lang/String;\n" +
+                        SmaliLine.SINGLE_SPACE + ".locals 4\n\n");
 
         String ogString = smaliLine.getParts()[smaliLine.getParts().length - 1]; // the last index holds the string
         int byteSize = ogString.length();
         String constType = getConstTypeForInt(byteSize);
         String sizeHex = "0x" + Integer.toHexString(byteSize);
 
-        obfFile.appendString("\t" + constType + " v0, " + sizeHex + "\n\n\tnew-array v0, v0, [B");
+        obfFile.appendString(SmaliLine.SINGLE_SPACE + constType + " v0, " + sizeHex + "\n\n" + SmaliLine.SINGLE_SPACE + "new-array v0, v0, [B");
 
         Random r = new Random(System.currentTimeMillis());
         byte[] b = ogString.getBytes();
@@ -107,22 +107,22 @@ public class SmaliLineObfuscator {
 
             String indexHex = "0x" + Integer.toHexString(i);
             obfFile.appendString(
-                    "\n\t.line " + (obfFile.debugLine++) + "\n" +
-                            "\tconst v1, " + tHex + "\n\n" +
-                            "\tushr-int/lit8 v2, v1, " + fHex +"\n\n" +
-                            "\tint-to-byte v2, v2\n\n" +
-                            "\t" + getConstTypeForInt(i) + " v3, " + indexHex + "\n\n" +
-                            "\taput-byte v2, v0, v3\n\n");
+                    "\n" + SmaliLine.SINGLE_SPACE + ".line " + (obfFile.debugLine++) + "\n" +
+                            SmaliLine.SINGLE_SPACE + "const v1, " + tHex + "\n\n" +
+                            SmaliLine.SINGLE_SPACE + "ushr-int/lit8 v2, v1, " + fHex + "\n\n" +
+                            SmaliLine.SINGLE_SPACE + "int-to-byte v2, v2\n\n" +
+                            SmaliLine.SINGLE_SPACE + getConstTypeForInt(i) + " v3, " + indexHex + "\n\n" +
+                            SmaliLine.SINGLE_SPACE + "aput-byte v2, v0, v3\n\n");
 
         }
 
-        obfFile.appendString("\t.line " + obfFile.debugLine + "\n" +
-                "\tnew-instance v2, Ljava/lang/String;\n\n" +
-                "\tinvoke-direct {v2, v0}, Ljava/lang/String;-><init>([B)V\n\n"+
-                "\treturn-object v2\n" +
+        obfFile.appendString(SmaliLine.SINGLE_SPACE + ".line " + obfFile.debugLine + "\n" +
+                SmaliLine.SINGLE_SPACE + "new-instance v2, Ljava/lang/String;\n\n" +
+                SmaliLine.SINGLE_SPACE + "invoke-direct {v2, v0}, Ljava/lang/String;-><init>([B)V\n\n" +
+                SmaliLine.SINGLE_SPACE + "return-object v2\n" +
                 ".end method");
 
-        obfFile.debugLine+=10;
+        obfFile.debugLine += 10;
     }
 
     // const-string v0, "Replace with your own action" =>
@@ -152,11 +152,11 @@ public class SmaliLineObfuscator {
         // add this to the apk (IT IS PART OF IT NOW!)
         APKInfo.getInstance().addSmaliFile(obfFile);
 
-        SmaliLine smaliLine = new SmaliLine("\t\tinvoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getParentFile());
+        SmaliLine smaliLine = new SmaliLine(SmaliLine.SINGLE_SPACE + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getParentFile());
         obfFile.addReferenceSmaliLine(smaliLine);
         lines.add(smaliLine);
         lines.add(new SmaliLine("", line.getParentFile()));
-        lines.add(new SmaliLine("\t\tmove-result-object " + register, line.getParentFile()));
+        lines.add(new SmaliLine(SmaliLine.SINGLE_SPACE + "move-result-object " + register, line.getParentFile()));
 
         return lines;
     }
