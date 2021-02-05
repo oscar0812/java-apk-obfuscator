@@ -42,7 +42,6 @@ public class MainClass {
         String[] apk_decompile_params = {"d", "-f", apkFile.getAbsolutePath(), "--output", outputDir.getAbsolutePath()};
         callAPKTool(apk_decompile_params);
         // tell apkinfo that we decompiled the apk
-        APKInfo.getInstance().fetchDecompiledInfo();
     }
 
     private void buildWithAPKTool(File outputDir) {
@@ -71,13 +70,12 @@ public class MainClass {
             //service.execute(s::processLines);
             s.processLines();
         }
-
     }
 
     // start the obfuscation process
     public void obfuscate() {
         ArrayList<SmaliFile> smaliFiles = APKInfo.getInstance().getSmaliFileList();
-        processFiles(new ArrayList<>(smaliFiles)); // read files line by line and extract SmaliLine's (class)
+        processFiles(smaliFiles); // read files line by line and extract SmaliLine's (class)
     }
 
 
@@ -90,11 +88,12 @@ public class MainClass {
         File outputDir = info.getApkDecompileDir();
 
         decompileWithAPKTool(apkFile, outputDir);
+        APKInfo.getInstance().fetchDecompiledInfo();
 
         System.out.println("==== DONE DECOMPILING ====");
         // TODO: work on obfuscate
 
-        obfuscate();
+        // obfuscate();
         int a = 1;
         /*
         buildWithAPKTool(outputDir);

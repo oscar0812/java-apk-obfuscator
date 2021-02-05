@@ -8,7 +8,12 @@ import java.util.HashMap;
 import java.util.Scanner;
 
 public class SmaliFile extends File {
-    private final ArrayList<SmaliLine> childLines = new ArrayList<>();
+    // chain the lines
+    private SmaliLine firstSmaliLine = null;
+    private SmaliLine lastSmaliLine = null;
+
+    private final HashMap<String, ArrayList<SmaliLine>> smaliLineMap = new HashMap<>(); // first word->list[SmaliLines]: ".field"->[....], "const-string"->[...]
+
     // what lines reference/link/use this file
     private final ArrayList<SmaliLine> referencedInlines = new ArrayList<>();
     private String smaliPackage = "";
@@ -35,10 +40,6 @@ public class SmaliFile extends File {
         super(parent, child);
     }
 
-    public ArrayList<SmaliLine> getChildLines() {
-        return childLines;
-    }
-
     public ArrayList<SmaliLine> getReferencedInSmaliLines() {
         return referencedInlines;
     }
@@ -49,7 +50,7 @@ public class SmaliFile extends File {
 
     public void appendString(String text) {
         for (String s : text.split("\\r?\\n|\\r")) { // split text by new line
-            childLines.addAll(SmaliLine.process(s, this));
+            appendSmaliLine(SmaliLine.process(s, this));
         }
     }
 
@@ -74,7 +75,7 @@ public class SmaliFile extends File {
         try (Scanner scanner = new Scanner(new File(getAbsolutePath()))) {
             while (scanner.hasNext()) {
                 String line = scanner.nextLine();
-                childLines.addAll(SmaliLine.process(line, this));
+                appendSmaliLine(SmaliLine.process(line, this));
             }
 
         } catch (IOException e) {
@@ -85,6 +86,23 @@ public class SmaliFile extends File {
         // System.out.println("PROCESSED: "+getAbsolutePath());
     }
 
+    private void appendSmaliLine(SmaliLine sl) {
+        if (firstSmaliLine == null) {
+            firstSmaliLine = sl;
+        }
+        if (lastSmaliLine == null) {
+            lastSmaliLine = sl;
+        } else {
+            lastSmaliLine = lastSmaliLine.insertAfterLine(sl);
+        }
+
+        // link the first word to a list of smali lines
+        String firstWord = sl.getParts()[0];
+        if (!smaliLineMap.containsKey(firstWord))
+            this.smaliLineMap.put(firstWord, new ArrayList<>());
+        smaliLineMap.get(firstWord).add(sl);
+    }
+
     public void addFieldLine(SmaliLine smaliLine) {
         SmaliField sf = new SmaliField(smaliLine);
         childFieldList.add(sf);
@@ -93,17 +111,20 @@ public class SmaliFile extends File {
 
     public void addMethodLine(SmaliLine smaliLine) {
         String[] parts = smaliLine.getParts();
-        if(parts[0].equals(".method")) {
+        if (parts[0].equals(".method")) {
             // start of a method
             SmaliMethod sm = new SmaliMethod(this, smaliLine);
+            smaliLine.setParentMethod(sm); // this line is part of this method
             childMethodList.add(sm);
 
             // update the hashmap, to search for method faster by name
             childMethodMap.put(sm.getShortMethodIdentifier(), sm);
 
-        } else if (childMethodList.size() > 0 && !childMethodList.get(childMethodList.size()-1).isEnded()) {
+        } else if (childMethodList.size() > 0 && !childMethodList.get(childMethodList.size() - 1).isEnded()) {
             // this line is part of a method
-            childMethodList.get(childMethodList.size()-1).appendChildLine(smaliLine);
+            SmaliMethod sm = childMethodList.get(childMethodList.size() - 1);
+            smaliLine.setParentMethod(sm);
+            sm.appendChildLine(smaliLine);
         }
     }
 
@@ -113,9 +134,12 @@ public class SmaliFile extends File {
 
                 FileWriter writer = new FileWriter(getAbsolutePath(), false);
 
-                for (SmaliLine line : childLines) {
+                SmaliLine line = firstSmaliLine;
+                while (line != null) {
                     writer.write(line.getText());
                     writer.write("\n");
+
+                    line = line.getNextSmaliLine();
                 }
 
                 writer.close();
@@ -150,5 +174,9 @@ public class SmaliFile extends File {
 
     public HashMap<String, ArrayList<SmaliLine>> getFieldReferences() {
         return fieldReferences;
+    }
+
+    public HashMap<String, ArrayList<SmaliLine>> getSmaliLineMap() {
+        return smaliLineMap;
     }
 }

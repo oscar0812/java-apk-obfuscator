@@ -147,9 +147,10 @@ public class SmaliLineObfuscator {
 
         // add this to the apk (IT IS PART OF IT NOW!)
         APKInfo.getInstance().addSmaliFile(obfFile);
-        ArrayList<SmaliLine> lines = SmaliLine.process(SmaliLine.SINGLE_SPACE + "invoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", inLine.getParentFile());
-        lines.addAll(SmaliLine.process("", inLine.getParentFile()));
-        lines.addAll(SmaliLine.process(SmaliLine.SINGLE_SPACE + "move-result-object " + register, inLine.getParentFile()));
+        ArrayList<SmaliLine> lines = new ArrayList<>();
+        lines.add(SmaliLine.process(SmaliLine.SINGLE_SPACE + "invoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", inLine.getParentFile()));
+        lines.add(SmaliLine.process("", inLine.getParentFile()));
+        lines.add(SmaliLine.process(SmaliLine.SINGLE_SPACE + "move-result-object " + register, inLine.getParentFile()));
 
         return lines;
     }

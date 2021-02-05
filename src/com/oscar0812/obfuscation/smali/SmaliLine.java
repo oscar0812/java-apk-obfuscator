@@ -20,6 +20,10 @@ import java.util.*;
  */
 
 public class SmaliLine {
+    // chain the lines
+    private SmaliLine prevSmaliLine = null;
+    private SmaliLine nextSmaliLine = null;
+
     public static final String SINGLE_SPACE = "    ";
     public static final String DOUBLE_SPACE = "        ";
     public static final String TRIPLE_SPACE = "            ";
@@ -35,6 +39,7 @@ public class SmaliLine {
     private boolean ignore = false;
 
     private final SmaliFile parentFile;
+    private SmaliMethod parentMethod = null; // is this line in a method?
 
     // what files this line points to
     private final ArrayList<SmaliFile> referenceSmaliFileList = new ArrayList<>();
@@ -71,6 +76,65 @@ public class SmaliLine {
         }
     }
 
+    // check if this line connects/refers to other lines, and if its a special line (method, field, etc)
+    public static SmaliLine process(String text, SmaliFile inFile) {
+        SmaliLine smaliLine = new SmaliLine(text, inFile);
+
+        // check if lines reference any class within the main package
+        HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getSmaliFileMap();
+
+        File smaliDir = APKInfo.getInstance().getSmaliDir();
+
+        // check if this lines references fields or methods
+        int arrowIndex = smaliLine.getText().indexOf("->");
+
+        // sget-object v2, Lcom/naman14/timber/helpers/MusicPlaybackTrack;->CREATOR:Landroid/os/Parcelable$Creator;
+        for (Substring ss : StringUtils.getSmaliClassSubstrings(text)) {
+            // Lcom/naman14/timber/helpers/MusicPlaybackTrack;
+            // remove L and ;
+            String subpath = ss.getText().substring(1, ss.getText().length() - 1);
+            File referencedFile = new File(smaliDir, subpath + ".smali");
+
+            if (smaliFileMap.containsKey(referencedFile.getAbsolutePath())) {
+                // referenced class is in main package (I don't want to obfuscate ALL files including libs)
+                SmaliFile referenced = smaliFileMap.get(referencedFile.getAbsolutePath());
+                referenced.addReferenceSmaliLine(smaliLine);
+                smaliLine.addReferenceSmaliFile(referenced);
+
+                // // CREATOR:Landroid/os/Parcelable$Creator;
+                if (ss.getEndIndex() == arrowIndex) {
+                    // REFERENCE TO METHOD OR FIELD!!
+                    String referenceTo = smaliLine.getText().substring(arrowIndex + 2);
+                    HashMap<String, ArrayList<SmaliLine>> storedRef;
+
+                    if (referenceTo.contains("(") && referenceTo.contains(")")) {
+                        // method
+                        storedRef = referenced.getMethodReferences();
+                    } else {
+                        // field
+                        storedRef = referenced.getFieldReferences();
+                    }
+
+                    if (!storedRef.containsKey(referenceTo)) {
+                        storedRef.put(referenceTo, new ArrayList<>());
+                    }
+                    storedRef.get(referenceTo).add(smaliLine);
+                }
+            }
+        }
+
+
+        // check if this line is part of a block (method, annotation, etc)
+        inFile.addMethodLine(smaliLine);
+
+        // check if this line is a field
+        if (smaliLine.getParts()[0].equals(".field")) {
+            inFile.addFieldLine(smaliLine);
+        }
+
+        return smaliLine;
+    }
+
     public String getText() {
         return text;
     }
@@ -85,6 +149,14 @@ public class SmaliLine {
 
     public SmaliFile getParentFile() {
         return parentFile;
+    }
+
+    public void setParentMethod(SmaliMethod parentMethod) {
+        this.parentMethod = parentMethod;
+    }
+
+    public SmaliMethod getParentMethod() {
+        return parentMethod;
     }
 
     public ArrayList<SmaliFile> getReferenceSmaliFileList() {
@@ -104,81 +176,32 @@ public class SmaliLine {
         return text.trim().isEmpty();
     }
 
-    // 1 line of text can become nothing (if ignored) or multiple lines (i.e, reflection makes multiple lines)
-    public static ArrayList<SmaliLine> process(String text, SmaliFile inFile) {
-        SmaliLine originalLine = new SmaliLine(text, inFile);
-        ArrayList<SmaliLine> smaliLines = new ArrayList<>();
-
-        // some lines should be ignored
-        if (originalLine.ignore) {
-            return smaliLines;
+    // run to the end of inSmaliLine chain and join both chains
+    public SmaliLine insertAfterLine(SmaliLine inSmaliLine) {
+        SmaliLine rightOfIn = inSmaliLine;
+        while (rightOfIn.nextSmaliLine != null) {
+            rightOfIn = rightOfIn.nextSmaliLine;
         }
 
-        String[] parts = originalLine.getParts();
-        if (parts.length > 0 && parts[0].equals("const-string")) {
-            // ["const-string", "v0,", "String here"]
-            // obfuscate string
-            SmaliLineObfuscator obf = SmaliLineObfuscator.getInstance();
-            smaliLines.addAll(obf.stringToStaticCall(originalLine));
-        } else {
-            smaliLines.add(originalLine);
+        SmaliLine rightOg = this.nextSmaliLine;
+
+        this.nextSmaliLine = inSmaliLine;
+        inSmaliLine.prevSmaliLine = this;
+
+        if (rightOg != null) {
+            rightOg.prevSmaliLine = rightOfIn;
+            rightOfIn.nextSmaliLine = rightOg;
         }
 
-        // check if lines reference any class within the main package
-        HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getSmaliFileMap();
+        return rightOfIn;
+    }
 
-        File smaliDir = APKInfo.getInstance().getSmaliDir();
-        // sget-object v2, Lcom/naman14/timber/helpers/MusicPlaybackTrack;->CREATOR:Landroid/os/Parcelable$Creator;
-        for (SmaliLine smaliLine : smaliLines) {
-            ArrayList<Substring> substrings = StringUtils.getSmaliClassSubstrings(text);
-            // check if this lines references fields or methods
-            int arrowIndex = smaliLine.getText().indexOf("->");
+    public SmaliLine getNextSmaliLine() {
+        return nextSmaliLine;
+    }
 
-            // Lcom/naman14/timber/helpers/MusicPlaybackTrack;
-            for (Substring ss : substrings) {
-                // remove L and ;
-                String subpath = ss.getText().substring(1, ss.getText().length() - 1);
-                File referencedFile = new File(smaliDir, subpath + ".smali");
-
-                if (smaliFileMap.containsKey(referencedFile.getAbsolutePath())) {
-                    // referenced class is in main package (I don't want to obfuscate ALL files including libs)
-                    SmaliFile referenced = smaliFileMap.get(referencedFile.getAbsolutePath());
-                    referenced.addReferenceSmaliLine(smaliLine);
-                    smaliLine.addReferenceSmaliFile(referenced);
-
-                    // // CREATOR:Landroid/os/Parcelable$Creator;
-                    if(ss.getEndIndex() == arrowIndex) {
-                        // REFERENCE TO METHOD OR FIELD!!
-                        String referenceTo = smaliLine.getText().substring(arrowIndex+2);
-                        HashMap<String, ArrayList<SmaliLine>> storedRef;
-
-                        if(referenceTo.contains("(") && referenceTo.contains(")")) {
-                            // method
-                            storedRef = referenced.getMethodReferences();
-                        } else {
-                            // field
-                            storedRef = referenced.getFieldReferences();
-                        }
-
-                        if(!storedRef.containsKey(referenceTo)) {
-                            storedRef.put(referenceTo, new ArrayList<>());
-                        }
-                        storedRef.get(referenceTo).add(smaliLine);
-                    }
-                }
-            }
-
-
-            // check if this line is part of a block (method, annotation, etc)
-            inFile.addMethodLine(smaliLine);
-
-            // check if this line is a field
-            if(smaliLine.getParts()[0].equals(".field")) {
-                inFile.addFieldLine(smaliLine);
-            }
-        }
-
-        return smaliLines;
+    public SmaliLine getPrevSmaliLine() {
+        return prevSmaliLine;
     }
 
     @Override
