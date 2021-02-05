@@ -49,7 +49,7 @@ public class SmaliFile extends File {
 
     public void appendString(String text) {
         for (String s : text.split("\\r?\\n|\\r")) { // split text by new line
-            SmaliLine.process(s, this);
+            childLines.addAll(SmaliLine.process(s, this));
         }
     }
 
@@ -74,7 +74,7 @@ public class SmaliFile extends File {
         try (Scanner scanner = new Scanner(new File(getAbsolutePath()))) {
             while (scanner.hasNext()) {
                 String line = scanner.nextLine();
-                SmaliLine.process(line, this);
+                childLines.addAll(SmaliLine.process(line, this));
             }
 
         } catch (IOException e) {
@@ -116,9 +116,6 @@ public class SmaliFile extends File {
                 for (SmaliLine line : childLines) {
                     writer.write(line.getText());
                     writer.write("\n");
-                    if (line.getParts()[0].equals(".end")) {
-                        writer.write("\n");
-                    }
                 }
 
                 writer.close();

@@ -15,6 +15,10 @@ import java.util.*;
  * Remove .line # lines for harder debugging
  */
 
+/**
+ * HEART of the project. Every text line in every smali file is a "SmaliLine"
+ */
+
 public class SmaliLine {
     public static final String SINGLE_SPACE = "    ";
     public static final String DOUBLE_SPACE = "        ";
@@ -150,18 +154,16 @@ public class SmaliLine {
 
                         if(referenceTo.contains("(") && referenceTo.contains(")")) {
                             // method
-                            storedRef = smaliLine.getParentFile().getMethodReferences();
+                            storedRef = referenced.getMethodReferences();
                         } else {
                             // field
-                            storedRef = smaliLine.getParentFile().getFieldReferences();
+                            storedRef = referenced.getFieldReferences();
                         }
 
                         if(!storedRef.containsKey(referenceTo)) {
                             storedRef.put(referenceTo, new ArrayList<>());
                         }
                         storedRef.get(referenceTo).add(smaliLine);
-
-                        int a = 1;
                     }
                 }
             }
@@ -174,8 +176,6 @@ public class SmaliLine {
             if(smaliLine.getParts()[0].equals(".field")) {
                 inFile.addFieldLine(smaliLine);
             }
-
-            inFile.getChildLines().add(smaliLine);
         }
 
         return smaliLines;

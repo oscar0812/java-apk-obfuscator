@@ -129,10 +129,8 @@ public class SmaliLineObfuscator {
     // invoke-static {}, Lcom/oscar0812/sample_navigation/StringUtil;->a()Ljava/lang/String;
     //
     // move-result-object v0
-    public ArrayList<SmaliLine> stringToStaticCall(SmaliLine line) {
-        ArrayList<SmaliLine> lines = new ArrayList<>();
-
-        String register = line.getParts()[1].replace(",", ""); // v0, => v0
+    public ArrayList<SmaliLine> stringToStaticCall(SmaliLine inLine) {
+        String register = inLine.getParts()[1].replace(",", ""); // v0, => v0
         String methodName = StringUtils.getRandomUniqueString();
 
         int randomNum = ThreadLocalRandom.current().nextInt(0, obfFilePaths.size() + 2);
@@ -140,23 +138,18 @@ public class SmaliLineObfuscator {
 
         SmaliFile obfFile;
         if (randomNum >= obfFilePaths.size()) {
-            obfFile = createObfFile(line);
+            obfFile = createObfFile(inLine);
         } else {
             obfFile = obfFileMap.get(obfFilePaths.get(randomNum));
         }
 
-        appendMethod(obfFile, line, methodName);
-
-        // obfFile.saveToDisk();
+        appendMethod(obfFile, inLine, methodName);
 
         // add this to the apk (IT IS PART OF IT NOW!)
         APKInfo.getInstance().addSmaliFile(obfFile);
-
-        SmaliLine smaliLine = new SmaliLine(SmaliLine.SINGLE_SPACE + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", line.getParentFile());
-        obfFile.addReferenceSmaliLine(smaliLine);
-        lines.add(smaliLine);
-        lines.add(new SmaliLine("", line.getParentFile()));
-        lines.add(new SmaliLine(SmaliLine.SINGLE_SPACE + "move-result-object " + register, line.getParentFile()));
+        ArrayList<SmaliLine> lines = SmaliLine.process(SmaliLine.SINGLE_SPACE + "invoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", inLine.getParentFile());
+        lines.addAll(SmaliLine.process("", inLine.getParentFile()));
+        lines.addAll(SmaliLine.process(SmaliLine.SINGLE_SPACE + "move-result-object " + register, inLine.getParentFile()));
 
         return lines;
     }
