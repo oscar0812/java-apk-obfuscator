@@ -2,12 +2,15 @@ package com.oscar0812.obfuscation;
 
 import brut.common.BrutException;
 import com.oscar0812.obfuscation.smali.SmaliFile;
+import com.oscar0812.obfuscation.smali.SmaliLine;
+import com.oscar0812.obfuscation.smali.SmaliLineObfuscator;
+import com.oscar0812.obfuscation.smali.SmaliMethod;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
+import java.io.ObjectStreamClass;
+import java.util.*;
+import java.util.stream.Stream;
 
 /*
  * STEPS:
@@ -23,8 +26,9 @@ import java.util.Collection;
  *   CONNECT TO BLUESTACKS ADB-LOGCAT:
  *       C:\Users\oscar\AppData\Local\Android\Sdk\platform-tools\adb.exe logcat localhost:63543
  *          63543 is the port in adb settings (gear icon -> preferences -> scroll down)
+ *
+ *   use jadx.exe to look at apk .dex source code
  * */
-
 
 
 public class MainClass {
@@ -64,18 +68,58 @@ public class MainClass {
         at.favre.tools.apksigner.SignTool.main(sign_params);
     }
 
-    // TODO: read the files in parallel to finish faster (might be alot of files)
-    private void processFiles(ArrayList<SmaliFile> smaliFiles) {
-        for(SmaliFile s: smaliFiles) {
-            //service.execute(s::processLines);
-            s.processLines();
-        }
-    }
-
     // start the obfuscation process
     public void obfuscate() {
-        ArrayList<SmaliFile> smaliFiles = APKInfo.getInstance().getSmaliFileList();
-        processFiles(smaliFiles); // read files line by line and extract SmaliLine's (class)
+
+        // TODO: read the files in parallel to finish faster (might be alot of files)
+        for (SmaliFile sf : APKInfo.getInstance().getSmaliFileList()) {
+            sf.processLines();
+        }
+        // all lines are processed, time to obfuscate
+        ArrayList<SmaliFile> copy = new ArrayList<>(APKInfo.getInstance().getSmaliFileList()); // since it changes
+        for (SmaliFile sf : copy) {
+            // System.out.println("\"" + sf.getAbsolutePath() + "\",");
+            HashMap<String, ArrayList<SmaliLine>> smaliLineMap = sf.getFirstWordSmaliLineMap();
+
+            // Obfuscate strings
+            if (smaliLineMap.containsKey("const-string")) {
+                SmaliLineObfuscator slo = SmaliLineObfuscator.getInstance();
+                // obfuscate strings
+                ArrayList<SmaliLine> smaliLines = smaliLineMap.get("const-string");
+                // DOESNT WORK: line 16 of SongLoader: "is_music=1 AND title != \'\'"
+                for (SmaliLine smaliLine : smaliLines) {
+                    String[] parts = smaliLine.getParts();
+                    if (parts.length > 0 && parts[parts.length - 1].contains("\\'\\'")) {
+                        // weird case with const-string if it contains \'\' and stored at v0
+                        if (parts[1].equals("v0,")) {
+                            continue;
+                        }
+                    }
+
+                    if (smaliLine.getParentMethod() != null && !smaliLine.isGarbage()) {
+                        SmaliMethod smaliMethod = smaliLine.getParentMethod();
+                        if (!smaliMethod.isConstructor()) {
+                            // dont obfuscate constructor string (for now)
+                            SmaliLine obfCall = slo.stringToStaticCall(smaliLine);
+                            smaliLine.getPrevSmaliLine().insertAfter(obfCall);
+                            smaliLine.delete();
+                        }
+                    }
+                }
+            }
+
+            // Obfuscate methods (method name change)
+
+            // Obfuscate classes (class name change)
+
+            // other...
+        }
+
+        // save
+        for (SmaliFile sf : APKInfo.getInstance().getSmaliFileList()) {
+            sf.saveToDisk();
+        }
+
     }
 
 
@@ -93,17 +137,19 @@ public class MainClass {
         System.out.println("==== DONE DECOMPILING ====");
         // TODO: work on obfuscate
 
-        // obfuscate();
-        int a = 1;
-        /*
+        obfuscate();
+
         buildWithAPKTool(outputDir);
         signAPKWithUber(apkFile, apkDir, outputDir);
-         */
+
     }
 
     // TODO: what about reflective methods?
     // obfuscate xml?
     // obfuscate assets?
+
+    // TODO: timber.apk crashes after const-string obfuscation, but doesn't if some lines are left out.
+    // TODO: track down the problem by NOT obfuscating some files and check if it still works, recursively
 
     public static void main(String[] args) {
         MainClass m = new MainClass();

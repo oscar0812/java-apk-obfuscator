@@ -129,7 +129,7 @@ public class SmaliLineObfuscator {
     // invoke-static {}, Lcom/oscar0812/sample_navigation/StringUtil;->a()Ljava/lang/String;
     //
     // move-result-object v0
-    public ArrayList<SmaliLine> stringToStaticCall(SmaliLine inLine) {
+    public SmaliLine stringToStaticCall(SmaliLine inLine) {
         String register = inLine.getParts()[1].replace(",", ""); // v0, => v0
         String methodName = StringUtils.getRandomUniqueString();
 
@@ -147,11 +147,10 @@ public class SmaliLineObfuscator {
 
         // add this to the apk (IT IS PART OF IT NOW!)
         APKInfo.getInstance().addSmaliFile(obfFile);
-        ArrayList<SmaliLine> lines = new ArrayList<>();
-        lines.add(SmaliLine.process(SmaliLine.SINGLE_SPACE + "invoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", inLine.getParentFile()));
-        lines.add(SmaliLine.process("", inLine.getParentFile()));
-        lines.add(SmaliLine.process(SmaliLine.SINGLE_SPACE + "move-result-object " + register, inLine.getParentFile()));
+        SmaliLine smaliLine = new SmaliLine(SmaliLine.SINGLE_SPACE + "invoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", inLine.getParentFile());
+        smaliLine.insertAfter("", smaliLine.getParentFile())
+                .insertAfter(SmaliLine.SINGLE_SPACE + "move-result-object " + register, inLine.getParentFile());
 
-        return lines;
+        return smaliLine;
     }
 }
