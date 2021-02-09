@@ -69,17 +69,14 @@ public class MainClass {
         at.favre.tools.apksigner.SignTool.main(sign_params);
     }
 
-    private void obfuscateStrings(ArrayList<SmaliLine> smaliLines) {
-        SmaliLineObfuscator slo = SmaliLineObfuscator.getInstance();
+    private void obfuscateStrings(ArrayList<SmaliLine> smaliLines, SmaliLineObfuscator slo) {
         // obfuscate strings
         // DOESNT WORK: line 16 of SongLoader: "is_music=1 AND title != \'\'"
         for (SmaliLine smaliLine : smaliLines) {
             String[] parts = smaliLine.getParts();
-            if (parts.length > 0 && parts[parts.length - 1].contains("\\'\\'")) {
+            if (parts.length > 2 && parts[parts.length - 1].contains("\\'\\'") && parts[1].equals("v0,")) {
                 // weird case with const-string if it contains \'\' and stored at v0
-                if (parts[1].equals("v0,")) {
-                    continue;
-                }
+                continue;
             }
 
             if (smaliLine.getParentMethod() != null && !smaliLine.isGarbage()) {
@@ -129,7 +126,7 @@ public class MainClass {
 
             // Obfuscate strings
             if (smaliLineMap.containsKey("const-string")) {
-                obfuscateStrings(smaliLineMap.get("const-string"));
+                obfuscateStrings(smaliLineMap.get("const-string"), SmaliLineObfuscator.getInstance());
             }
 
             // Obfuscate methods (method name change)
