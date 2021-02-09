@@ -1,6 +1,10 @@
 package com.oscar0812.obfuscation.smali;
 
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 
 public class SmaliMethod {
     private boolean ended;
@@ -9,23 +13,33 @@ public class SmaliMethod {
     private SmaliLine firstSmaliLine; // .method ...
     private SmaliLine lastSmaliLine = null; // .end method ...
 
-
     private boolean isConstructor = false;
     private String[] accessSpecifiers = null;
-    private final String methodName;
-    private final String[] methodParameters; // how to hold parameters? just like this for now
-    private final String methodReturnType;
+    private String methodName;
+    private String methodParameterStr;
+    private String[] methodParameterArr; // how to hold parameters? just like this for now
+    private String methodReturnType;
 
     // onCreate(Landroid/os/Bundle;)V
-    private final String methodIdentifier;
+    private String methodIdentifier = null;
+
+    private String oldMethodIdentifier = null;
 
     // parentFile is the file which this method resides: onCreate()'s parentFile is MainActivity.smali
     // firstLine: .method protected onCreate(Landroid/os/Bundle;)V
     public SmaliMethod(SmaliFile parentFile, SmaliLine firstLine) {
         this.parentFile = parentFile;
-        this.firstSmaliLine = firstLine;
+        setFirstSmaliLine(firstLine);
+    }
 
-        String[] parts = firstLine.getParts();
+    public void setFirstSmaliLine(SmaliLine firstSmaliLine) {
+        this.firstSmaliLine = firstSmaliLine;
+        this.firstSmaliLine.setParentMethod(this);
+
+        // check if already renamed
+        this.oldMethodIdentifier = this.methodIdentifier;
+
+        String[] parts = firstSmaliLine.getParts();
 
         // "default" access modifier: .method mName()V
         if (parts.length > 2) {
@@ -37,18 +51,74 @@ public class SmaliMethod {
         // onCreate(Landroid/os/Bundle;)V
         this.methodIdentifier = parts[parts.length - 1];
 
+        // onCreate
         this.methodName = methodIdentifier.substring(0, methodIdentifier.indexOf("("));
 
         // get string in (...)
         int firstBracket = methodIdentifier.indexOf('(');
         // Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;
-        String contents = methodIdentifier.substring(firstBracket + 1, methodIdentifier.indexOf(')', firstBracket));
+        this.methodParameterStr = methodIdentifier.substring(firstBracket + 1, methodIdentifier.indexOf(')', firstBracket));
         // ["Landroid/view/LayoutInflater", "Landroid/view/ViewGroup", "Landroid/os/Bundle"]
-        this.methodParameters = contents.split(";");
+        this.methodParameterArr = this.methodParameterStr.split(";");
 
         // the return is after the )
         // Landroid/view/View
-        this.methodReturnType = methodIdentifier.substring(methodIdentifier.indexOf(")") + 1, methodIdentifier.length() - 1);
+        this.methodReturnType = methodIdentifier.substring(methodIdentifier.indexOf(")") + 1);
+    }
+
+    private String getAvailableID() {
+        String id;
+
+        for (char x = 97; x <= 122; x++) {
+            for (int y = 1; y < 8; y++) {
+                id = ((x + "").repeat(y)) + "(" + this.methodParameterStr + ")";
+                if (!this.getParentFile().getChildMethodWithNoReturnMap().containsKey(id)) {
+                    // new method!
+                    return id + methodReturnType;
+                }
+            }
+        }
+
+
+        return "";
+    }
+
+    // return the new identifier
+    public void changeMethodName(ArrayList<SmaliLine> smaliLinesPointingToThisMethod) {
+        // 1. get new method name
+        String[] parts = this.firstSmaliLine.getParts();
+        StringBuilder builder = new StringBuilder(firstSmaliLine.getWhitespace());
+
+        for (int x = 0; x < parts.length - 1; x++) {
+            builder.append(parts[x]);
+            builder.append(" ");
+        }
+
+        String oldMethodID = this.methodIdentifier;
+        String oldMethodIDNoReturn = oldMethodID.substring(0, oldMethodID.indexOf(")") + 1);
+        String newMethodID = getAvailableID();
+        String newMethodIDNoReturn = newMethodID.substring(0, newMethodID.indexOf(")") + 1);
+
+        builder.append(newMethodID);
+
+        // 2. make a new method start line
+        SmaliLine newFirstLine = new SmaliLine(builder.toString(), this.getParentFile());
+        this.firstSmaliLine.getPrevSmaliLine().insertAfter(newFirstLine);
+        this.firstSmaliLine.delete();
+        this.setFirstSmaliLine(newFirstLine);
+
+        // 3. unlink method name from parent file
+        HashMap<String, SmaliMethod> map = this.getParentFile().getChildMethodWithNoReturnMap();
+        map.put(newMethodIDNoReturn, map.remove(oldMethodIDNoReturn));
+
+        // 4. change all lines that called this method by the old name
+        for (SmaliLine smaliLine: smaliLinesPointingToThisMethod) {
+            String replaceThis = this.getParentFile().getSmaliPackage()+"->"+oldMethodID;
+            String newText = this.getParentFile().getSmaliPackage()+"->"+newMethodID;
+            String text = smaliLine.getText();
+            smaliLine.setText(text.replace(replaceThis, newText));
+            int aa =1;
+        }
     }
 
     public void setLastLine(SmaliLine lastSmaliLine) {
@@ -87,12 +157,16 @@ public class SmaliMethod {
         return accessSpecifiers;
     }
 
+    public String getOldMethodIdentifier() {
+        return oldMethodIdentifier;
+    }
+
     public String getMethodName() {
         return methodName;
     }
 
-    public String[] getMethodParameters() {
-        return methodParameters;
+    public String[] getMethodParameterArr() {
+        return methodParameterArr;
     }
 
     public String getMethodReturnType() {
@@ -121,7 +195,7 @@ public class SmaliMethod {
                 ", isConstructor=" + isConstructor +
                 ", accessSpecifiers=" + Arrays.toString(accessSpecifiers) +
                 ", methodName='" + methodName + '\'' +
-                ", methodParameters=" + Arrays.toString(methodParameters) +
+                ", methodParameters=" + Arrays.toString(methodParameterArr) +
                 ", methodReturnType='" + methodReturnType + '\'' +
                 ", methodIdentifier='" + methodIdentifier + '\'' +
                 '}';

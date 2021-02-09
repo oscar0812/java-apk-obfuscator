@@ -79,6 +79,9 @@ public class SmaliLine {
             this.ignore = SmaliLine.IGNORE_START_LINES.contains(parts[0]);
         }
 
+        this.referenceSmaliFileList.clear();
+        this.referenceSmaliFileMap.clear();
+
         process();
     }
 
@@ -90,7 +93,8 @@ public class SmaliLine {
         File smaliDir = APKInfo.getInstance().getSmaliDir();
 
         // check if this lines references fields or methods
-        int arrowIndex = this.getText().indexOf("->");
+        String text = this.getText();
+        int arrowIndex = text.indexOf("->");
 
         // sget-object v2, Lcom/naman14/timber/helpers/MusicPlaybackTrack;->CREATOR:Landroid/os/Parcelable$Creator;
         for (Substring ss : StringUtils.getSmaliClassSubstrings(text)) {
@@ -103,7 +107,6 @@ public class SmaliLine {
                 // referenced class is in main package (I don't want to obfuscate ALL files including libs)
                 SmaliFile referenced = smaliFileMap.get(referencedFile.getAbsolutePath());
                 referenced.addReferenceSmaliLine(this);
-                this.addReferenceSmaliFile(referenced);
 
                 // // CREATOR:Landroid/os/Parcelable$Creator;
                 if (ss.getEndIndex() == arrowIndex) {
@@ -138,7 +141,23 @@ public class SmaliLine {
     }
 
     public String getText() {
-        return text;
+        StringBuilder builder = new StringBuilder(whitespace);
+        for (int x = 0; x < parts.length; x++) {
+            if (x + 1 == parts.length) {
+                // end
+                if(parts[0].equals("const-string") && !parts[x].startsWith("\"")) {
+                    // const-string needs ""
+                    builder.append("\"").append(parts[x]).append("\"");
+                } else {
+                    builder.append(parts[x]);
+                }
+            } else {
+                // not at the end
+                builder.append(parts[x]);
+                builder.append(" ");
+            }
+        }
+        return builder.toString();
     }
 
     public String getWhitespace() {
@@ -169,13 +188,12 @@ public class SmaliLine {
         return referenceSmaliFileMap;
     }
 
-    public void addReferenceSmaliFile(SmaliFile smaliFile) {
-        referenceSmaliFileList.add(smaliFile);
-        referenceSmaliFileMap.put(smaliFile.getSmaliPackage(), smaliFile);
-    }
-
     public boolean isEmpty() {
         return text.trim().isEmpty();
+    }
+
+    public boolean isComment() {
+        return text.trim().startsWith("#");
     }
 
     // run to the end of inSmaliLine chain and join both chains
@@ -232,21 +250,6 @@ public class SmaliLine {
 
     public String getID() {
         return ID;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        SmaliLine smaliLine = (SmaliLine) o;
-        return ignore == smaliLine.ignore && Objects.equals(prevSmaliLine, smaliLine.prevSmaliLine) && Objects.equals(nextSmaliLine, smaliLine.nextSmaliLine) && Objects.equals(text, smaliLine.text) && Objects.equals(whitespace, smaliLine.whitespace) && Arrays.equals(parts, smaliLine.parts) && Objects.equals(parentFile, smaliLine.parentFile) && Objects.equals(parentMethod, smaliLine.parentMethod) && Objects.equals(referenceSmaliFileList, smaliLine.referenceSmaliFileList) && Objects.equals(referenceSmaliFileMap, smaliLine.referenceSmaliFileMap) && Objects.equals(ID, smaliLine.ID);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = Objects.hash(prevSmaliLine, nextSmaliLine, text, whitespace, ignore, parentFile, parentMethod, referenceSmaliFileList, referenceSmaliFileMap, ID);
-        result = 31 * result + Arrays.hashCode(parts);
-        return result;
     }
 
     @Override

@@ -24,6 +24,7 @@ import java.util.stream.Stream;
  *
  *
  *   CONNECT TO BLUESTACKS ADB-LOGCAT:
+ *       C:\Users\oscar\AppData\Local\Android\Sdk\platform-tools\adb.exe connect localhost:63543
  *       C:\Users\oscar\AppData\Local\Android\Sdk\platform-tools\adb.exe logcat localhost:63543
  *          63543 is the port in adb settings (gear icon -> preferences -> scroll down)
  *
@@ -68,6 +69,46 @@ public class MainClass {
         at.favre.tools.apksigner.SignTool.main(sign_params);
     }
 
+    private void obfuscateStrings(ArrayList<SmaliLine> smaliLines) {
+        SmaliLineObfuscator slo = SmaliLineObfuscator.getInstance();
+        // obfuscate strings
+        // DOESNT WORK: line 16 of SongLoader: "is_music=1 AND title != \'\'"
+        for (SmaliLine smaliLine : smaliLines) {
+            String[] parts = smaliLine.getParts();
+            if (parts.length > 0 && parts[parts.length - 1].contains("\\'\\'")) {
+                // weird case with const-string if it contains \'\' and stored at v0
+                if (parts[1].equals("v0,")) {
+                    continue;
+                }
+            }
+
+            if (smaliLine.getParentMethod() != null && !smaliLine.isGarbage()) {
+                SmaliMethod smaliMethod = smaliLine.getParentMethod();
+                if (!smaliMethod.isConstructor()) {
+                    // dont obfuscate constructor string (for now)
+                    SmaliLine obfCall = slo.stringToStaticCall(smaliLine);
+                    smaliLine.getPrevSmaliLine().insertAfter(obfCall);
+                    smaliLine.delete();
+                }
+            }
+        }
+    }
+
+    private void obfuscateMethod(SmaliMethod smaliMethod) {
+        if(smaliMethod.isConstructor()) {
+            // can't rename constructors
+            return;
+        }
+
+        HashMap<String, ArrayList<SmaliLine>> methodReferenceMap = smaliMethod.getParentFile().getMethodReferences();
+
+        if(methodReferenceMap.containsKey(smaliMethod.getMethodIdentifier())) {
+            // this file created this method and lines are calling it
+            // what about parent class method overriding? will that be an issue?
+            // smaliMethod.changeMethodName(methodReferenceMap.get(smaliMethod.getMethodIdentifier()));
+        }
+    }
+
     // start the obfuscation process
     public void obfuscate() {
 
@@ -75,40 +116,27 @@ public class MainClass {
         for (SmaliFile sf : APKInfo.getInstance().getSmaliFileList()) {
             sf.processLines();
         }
-        // all lines are processed, time to obfuscate
+
         ArrayList<SmaliFile> copy = new ArrayList<>(APKInfo.getInstance().getSmaliFileList()); // since it changes
-        for (SmaliFile sf : copy) {
-            // System.out.println("\"" + sf.getAbsolutePath() + "\",");
-            HashMap<String, ArrayList<SmaliLine>> smaliLineMap = sf.getFirstWordSmaliLineMap();
+
+        // sort, put parent files first
+        copy.sort((a, b) -> Integer.compare(b.getChildFileMap().size(), a.getChildFileMap().size()));
+
+        // all lines are processed, time to obfuscate
+        for (SmaliFile smaliFile : copy) {
+            // System.out.println("\"" + smaliFile.getAbsolutePath() + "\",");
+            HashMap<String, ArrayList<SmaliLine>> smaliLineMap = smaliFile.getFirstWordSmaliLineMap();
 
             // Obfuscate strings
             if (smaliLineMap.containsKey("const-string")) {
-                SmaliLineObfuscator slo = SmaliLineObfuscator.getInstance();
-                // obfuscate strings
-                ArrayList<SmaliLine> smaliLines = smaliLineMap.get("const-string");
-                // DOESNT WORK: line 16 of SongLoader: "is_music=1 AND title != \'\'"
-                for (SmaliLine smaliLine : smaliLines) {
-                    String[] parts = smaliLine.getParts();
-                    if (parts.length > 0 && parts[parts.length - 1].contains("\\'\\'")) {
-                        // weird case with const-string if it contains \'\' and stored at v0
-                        if (parts[1].equals("v0,")) {
-                            continue;
-                        }
-                    }
-
-                    if (smaliLine.getParentMethod() != null && !smaliLine.isGarbage()) {
-                        SmaliMethod smaliMethod = smaliLine.getParentMethod();
-                        if (!smaliMethod.isConstructor()) {
-                            // dont obfuscate constructor string (for now)
-                            SmaliLine obfCall = slo.stringToStaticCall(smaliLine);
-                            smaliLine.getPrevSmaliLine().insertAfter(obfCall);
-                            smaliLine.delete();
-                        }
-                    }
-                }
+                obfuscateStrings(smaliLineMap.get("const-string"));
             }
 
             // Obfuscate methods (method name change)
+            ArrayList<SmaliMethod> fileMethods = new ArrayList<>(smaliFile.getChildMethodList());
+            for(SmaliMethod smaliMethod: fileMethods) {
+                obfuscateMethod(smaliMethod);
+            }
 
             // Obfuscate classes (class name change)
 
@@ -116,8 +144,8 @@ public class MainClass {
         }
 
         // save
-        for (SmaliFile sf : APKInfo.getInstance().getSmaliFileList()) {
-            sf.saveToDisk();
+        for (SmaliFile smaliFile : APKInfo.getInstance().getSmaliFileList()) {
+            smaliFile.saveToDisk();
         }
 
     }

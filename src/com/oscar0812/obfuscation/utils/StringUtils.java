@@ -65,6 +65,8 @@ public class StringUtils {
         for (char c: text.toCharArray()) {
             if(Character.isWhitespace(c)) {
                 wsb.append(c);
+            } else {
+                break;
             }
         }
         return wsb.toString();
