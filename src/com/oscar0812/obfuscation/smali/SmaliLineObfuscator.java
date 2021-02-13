@@ -107,7 +107,7 @@ public class SmaliLineObfuscator {
 
             String indexHex = "0x" + Integer.toHexString(i);
             obfFile.appendString(
-                    "\n" + SmaliLine.SINGLE_SPACE + ".line " + (obfFile.debugLine++) + "\n" +
+                    "\n" + SmaliLine.SINGLE_SPACE + // ".line " + (obfFile.debugLine++) + "\n" +
                             SmaliLine.SINGLE_SPACE + "const v1, " + tHex + "\n\n" +
                             SmaliLine.SINGLE_SPACE + "ushr-int/lit8 v2, v1, " + fHex + "\n\n" +
                             SmaliLine.SINGLE_SPACE + "int-to-byte v2, v2\n\n" +
@@ -116,13 +116,13 @@ public class SmaliLineObfuscator {
 
         }
 
-        obfFile.appendString(SmaliLine.SINGLE_SPACE + ".line " + obfFile.debugLine + "\n" +
+        obfFile.appendString(SmaliLine.SINGLE_SPACE + // ".line " + obfFile.debugLine + "\n" +
                 SmaliLine.SINGLE_SPACE + "new-instance v2, Ljava/lang/String;\n\n" +
                 SmaliLine.SINGLE_SPACE + "invoke-direct {v2, v0}, Ljava/lang/String;-><init>([B)V\n\n" +
                 SmaliLine.SINGLE_SPACE + "return-object v2\n" +
                 ".end method");
 
-        obfFile.debugLine += 10;
+        // obfFile.debugLine += 10;
     }
 
     // const-string v0, "Replace with your own action" =>

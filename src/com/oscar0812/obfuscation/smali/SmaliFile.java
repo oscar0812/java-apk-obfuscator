@@ -3,7 +3,6 @@ package com.oscar0812.obfuscation.smali;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
@@ -14,6 +13,7 @@ public class SmaliFile extends File {
     private SmaliLine lastSmaliLine = null;
 
     private final HashMap<String, ArrayList<SmaliLine>> firstWordSmaliLineMap = new HashMap<>(); // first word->list[SmaliLines]: ".field"->[....], "const-string"->[...]
+    private SmaliLine lastDescriptiveComment = null;
 
     // what lines reference/link/use this file
     private final ArrayList<SmaliLine> referencedInlines = new ArrayList<>();
@@ -21,18 +21,24 @@ public class SmaliFile extends File {
     private String smaliClass = "";
 
     // field lines
-    private final ArrayList<SmaliField> childFieldList = new ArrayList<>();
-    private final HashMap<String, SmaliField> childFieldMap = new HashMap<>();
+    private final ArrayList<SmaliField> fieldList = new ArrayList<>();
+    private final HashMap<String, SmaliField> fieldMap = new HashMap<>();
 
     // file lines (parent - child)
     private final HashMap<String, SmaliFile> childFileMap = new HashMap<>();
     private final HashMap<String, SmaliFile> parentFileMap = new HashMap<>();
 
-    // method blocks
-    private final ArrayList<SmaliMethod> childMethodList = new ArrayList<>();
+    // married share a child file
+    private final HashMap<String, SmaliFile> marriedFileMap = new HashMap<>();
 
-    // getCurrentTrack() -> [line, line]
-    private final HashMap<String, SmaliMethod> childMethodWithNoReturnMap = new HashMap<>();
+    // method blocks
+    private final ArrayList<SmaliMethod> methodList = new ArrayList<>();
+
+    // getCurrentTrack() -> SmaliMethod
+    private final HashMap<String, SmaliMethod> methodMap = new HashMap<>();
+
+    private final HashMap<String, String> methodNameChange = new HashMap<>();
+    private final HashMap<String, String> fieldNameChange = new HashMap<>();
 
     private final HashMap<String, ArrayList<SmaliLine>> methodReferences = new HashMap<>(); // link method name to lines that reference it
     private final HashMap<String, ArrayList<SmaliLine>> fieldReferences = new HashMap<>();  // link field name to lines that reference it
@@ -58,7 +64,8 @@ public class SmaliFile extends File {
         inLine.getReferenceSmaliFileMap().put(this.getSmaliPackage(), this);
 
         // check if parent - child
-        if (inLine.getParts()[0].equals(".implements")) {
+        String firstWord = inLine.getParts()[0];
+        if (firstWord.equals(".implements") || firstWord.equals(".super")) {
             this.getChildFileMap().put(inLine.getParentFile().getAbsolutePath(), inLine.getParentFile());
             inLine.getParentFile().getParentFileMap().put(this.getAbsolutePath(), this);
         }
@@ -114,12 +121,20 @@ public class SmaliFile extends File {
         if (!firstWordSmaliLineMap.containsKey(firstWord))
             this.firstWordSmaliLineMap.put(firstWord, new ArrayList<>());
         firstWordSmaliLineMap.get(firstWord).add(sl);
+
+        // keep a track of comments (for virtual and direct method reference)
+        if (sl.isComment()) {
+            String text = sl.getText();
+            if (text.contains("direct methods") || text.contains("virtual methods")) {
+                lastDescriptiveComment = sl;
+            }
+        }
     }
 
     public void addFieldLine(SmaliLine smaliLine) {
         SmaliField sf = new SmaliField(smaliLine);
-        childFieldList.add(sf);
-        childFieldMap.put(sf.getFullField(), sf);
+        fieldList.add(sf);
+        fieldMap.put(sf.getFieldName(), sf);
     }
 
     public void addMethodLine(SmaliLine smaliLine) {
@@ -127,15 +142,19 @@ public class SmaliFile extends File {
         if (parts[0].equals(".method")) {
             // start of a method
             SmaliMethod sm = new SmaliMethod(this, smaliLine);
-            childMethodList.add(sm);
+            if (lastDescriptiveComment != null) {
+                String text = lastDescriptiveComment.getText();
+                sm.setMethodType(text.contains("virtual") ? "virtual" : text.contains("direct") ? "direct" : "");
+            }
+            methodList.add(sm);
 
             // update the hashmap, to search for method faster by name
             String id = sm.getMethodIdentifier();
-            childMethodWithNoReturnMap.put(id.substring(0, id.indexOf(")") + 1), sm);
-        } else if (childMethodList.size() > 0 && !childMethodList.get(childMethodList.size() - 1).isEnded()) {
+            methodMap.put(id.substring(0, id.indexOf(")") + 1), sm);
+        } else if (methodList.size() > 0 && !methodList.get(methodList.size() - 1).isEnded()) {
             // this line is part of a method
             if (parts[0].equals(".end") && parts[1].equals("method")) {
-                SmaliMethod sm = childMethodList.get(childMethodList.size() - 1);
+                SmaliMethod sm = methodList.get(methodList.size() - 1);
                 smaliLine.setParentMethod(sm);
                 sm.setLastLine(smaliLine);
             }
@@ -172,20 +191,20 @@ public class SmaliFile extends File {
 
     }
 
-    public ArrayList<SmaliMethod> getChildMethodList() {
-        return childMethodList;
+    public ArrayList<SmaliMethod> getMethodList() {
+        return methodList;
     }
 
-    public HashMap<String, SmaliMethod> getChildMethodWithNoReturnMap() {
-        return childMethodWithNoReturnMap;
+    public HashMap<String, SmaliMethod> getMethodMap() {
+        return methodMap;
     }
 
-    public ArrayList<SmaliField> getChildFieldList() {
-        return childFieldList;
+    public ArrayList<SmaliField> getFieldList() {
+        return fieldList;
     }
 
-    public HashMap<String, SmaliField> getChildFieldMap() {
-        return childFieldMap;
+    public HashMap<String, SmaliField> getFieldMap() {
+        return fieldMap;
     }
 
     public HashMap<String, ArrayList<SmaliLine>> getMethodReferences() {
@@ -206,5 +225,17 @@ public class SmaliFile extends File {
 
     public HashMap<String, SmaliFile> getParentFileMap() {
         return parentFileMap;
+    }
+
+    public HashMap<String, String> getMethodNameChange() {
+        return methodNameChange;
+    }
+
+    public HashMap<String, String> getFieldNameChange() {
+        return fieldNameChange;
+    }
+
+    public HashMap<String, SmaliFile> getMarriedFileMap() {
+        return marriedFileMap;
     }
 }

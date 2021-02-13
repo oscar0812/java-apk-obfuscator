@@ -2,6 +2,7 @@ package com.oscar0812.obfuscation;
 
 import com.oscar0812.obfuscation.res.ResourceInfo;
 import com.oscar0812.obfuscation.smali.SmaliFile;
+import com.oscar0812.obfuscation.smali.SmaliLine;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
@@ -17,7 +18,9 @@ public class APKInfo {
     private File apkDecompileDir;
     private File smaliDir, resDir;
 
-    private SmaliFile RSmaliFile;
+    private SmaliFile mainRSmaliFile;
+    private final HashMap<String, SmaliFile> RFileMap = new HashMap<>();
+
     private final HashMap<String, SmaliFile> smaliFileMap = new HashMap<>();
     private final ArrayList<SmaliFile> smaliFileList = new ArrayList<>();
 
@@ -101,6 +104,7 @@ public class APKInfo {
         manifestFileInfo();
         ResourceInfo.getInstance(); // start a resource info instance
         fetchSmaliFiles();
+        fetchRSmaliFiles();
     }
 
     // get android info from android manifest
@@ -159,7 +163,7 @@ public class APKInfo {
                     File rID = new File(parent, "R$id.smali");
                     // every R.smali comes with a R$id.smali by design
                     if (rID.exists()) {
-                        RSmaliFile = new SmaliFile(parent, "R.smali");
+                        mainRSmaliFile = new SmaliFile(parent, "R.smali");
                         break;
                     }
                 } else if (!parent.getAbsolutePath().equals(smaliDir.getAbsolutePath())) {
@@ -171,12 +175,12 @@ public class APKInfo {
             }
         }
 
-        assert RSmaliFile != null;
+        assert mainRSmaliFile != null;
 
         // got R.smali, now get all files in smali/main_package directory
         // meh recursion, use queue
         q.clear();
-        q.add(RSmaliFile.getParentFile());
+        q.add(mainRSmaliFile.getParentFile());
 
         // to set the smali packages
         HashMap<String, String> pathToPackage = new HashMap<>();
@@ -227,7 +231,28 @@ public class APKInfo {
         }
     }
 
+    private void fetchRSmaliFiles() {
+        // get R.smali subclasses
+        mainRSmaliFile.processLines();
+
+        RFileMap.put(mainRSmaliFile.getAbsolutePath(), mainRSmaliFile);
+        for(SmaliLine annotation: mainRSmaliFile.getFirstWordSmaliLineMap().get(".annotation")) {
+            SmaliLine runner = annotation.getNextSmaliLine();
+            while(!runner.getParts()[0].equals(".end")) {
+                for(SmaliFile smaliFile: runner.getReferenceSmaliFileList()) {
+                    RFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
+                }
+
+                runner = runner.getNextSmaliLine();
+            }
+        }
+    }
+
     public String getName() {
         return apkName;
+    }
+
+    public HashMap<String, SmaliFile> getRFileMap() {
+        return RFileMap;
     }
 }

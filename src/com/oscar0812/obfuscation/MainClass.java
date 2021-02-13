@@ -1,16 +1,11 @@
 package com.oscar0812.obfuscation;
 
 import brut.common.BrutException;
-import com.oscar0812.obfuscation.smali.SmaliFile;
-import com.oscar0812.obfuscation.smali.SmaliLine;
-import com.oscar0812.obfuscation.smali.SmaliLineObfuscator;
-import com.oscar0812.obfuscation.smali.SmaliMethod;
+import com.oscar0812.obfuscation.smali.*;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.ObjectStreamClass;
 import java.util.*;
-import java.util.stream.Stream;
 
 /*
  * STEPS:
@@ -69,9 +64,66 @@ public class MainClass {
         at.favre.tools.apksigner.SignTool.main(sign_params);
     }
 
+    private void connectParents(ArrayList<SmaliFile> arr) {
+        // bubble up to parents with no children
+        ArrayList<SmaliFile> parents = new ArrayList<>();
+        for (SmaliFile smaliFile : arr) {
+            if (smaliFile.getChildFileMap().size() == 0) {
+                break;
+            }
+            parents.add(smaliFile);
+        }
+
+        Queue<SmaliFile> q = new LinkedList<>(parents);
+        while (!q.isEmpty()) {
+            SmaliFile parentFile = q.poll();
+            ArrayList<SmaliFile> allChildren = new ArrayList<>();
+            Queue<SmaliFile> bubbler = new LinkedList<>();
+            bubbler.add(parentFile);
+
+            Set<String> checked = new HashSet<>();
+            while (!bubbler.isEmpty()) {
+                SmaliFile b = bubbler.poll();
+
+                if (checked.contains(b.getAbsolutePath())) {
+                    continue;
+                }
+                checked.add(b.getAbsolutePath());
+
+                allChildren.addAll(b.getChildFileMap().values());
+                bubbler.addAll(b.getChildFileMap().values());
+            }
+
+            // we have the child list (depth), so now assign
+            for (SmaliFile childFile : allChildren) {
+                childFile.getParentFileMap().put(parentFile.getAbsolutePath(), parentFile);
+                parentFile.getChildFileMap().put(childFile.getAbsolutePath(), childFile);
+            }
+        }
+
+
+        // connect married files: files that share a child
+        for (int x = 0; x < arr.size(); x++) {
+            SmaliFile parentFile1 = arr.get(x);
+            Set<String> parentFile1Keys = parentFile1.getChildFileMap().keySet();
+            if (parentFile1.getChildFileMap().size() == 0) {
+                break;
+            }
+            for (int y = x + 1; y < arr.size(); y++) {
+                SmaliFile parentFile2 = arr.get(y);
+                Set<String> parentFile2Keys = parentFile2.getChildFileMap().keySet();
+                if (!Collections.disjoint(parentFile1Keys, parentFile2Keys)) {
+                    // disjoint return true if no elements in common, false o.t.w
+                    parentFile1.getMarriedFileMap().put(parentFile2.getAbsolutePath(), parentFile2);
+                    parentFile2.getMarriedFileMap().put(parentFile1.getAbsolutePath(), parentFile1);
+                }
+            }
+        }
+    }
+
     private void obfuscateStrings(ArrayList<SmaliLine> smaliLines, SmaliLineObfuscator slo) {
         // obfuscate strings
-        // DOESNT WORK: line 16 of SongLoader: "is_music=1 AND title != \'\'"
+        // DOESN'T WORK: line 16 of SongLoader: "is_music=1 AND title != \'\'"
         for (SmaliLine smaliLine : smaliLines) {
             String[] parts = smaliLine.getParts();
             if (parts.length > 2 && parts[parts.length - 1].contains("\\'\\'") && parts[1].equals("v0,")) {
@@ -92,17 +144,17 @@ public class MainClass {
     }
 
     private void obfuscateMethod(SmaliMethod smaliMethod) {
-        if(smaliMethod.isConstructor()) {
+        if (!smaliMethod.canRename()) {
             // can't rename constructors
             return;
         }
 
         HashMap<String, ArrayList<SmaliLine>> methodReferenceMap = smaliMethod.getParentFile().getMethodReferences();
 
-        if(methodReferenceMap.containsKey(smaliMethod.getMethodIdentifier())) {
+        if (methodReferenceMap.containsKey(smaliMethod.getMethodIdentifier())) {
             // this file created this method and lines are calling it
             // what about parent class method overriding? will that be an issue?
-            // smaliMethod.changeMethodName(methodReferenceMap.get(smaliMethod.getMethodIdentifier()));
+            smaliMethod.changeMethodName();
         }
     }
 
@@ -119,8 +171,16 @@ public class MainClass {
         // sort, put parent files first
         copy.sort((a, b) -> Integer.compare(b.getChildFileMap().size(), a.getChildFileMap().size()));
 
+        connectParents(copy);
+
         // all lines are processed, time to obfuscate
         for (SmaliFile smaliFile : copy) {
+
+            if(APKInfo.getInstance().getRFileMap().containsKey(smaliFile.getAbsolutePath())) {
+                // don't obfuscate R files, we need them intact for xml obfuscation
+                continue;
+            }
+
             // System.out.println("\"" + smaliFile.getAbsolutePath() + "\",");
             HashMap<String, ArrayList<SmaliLine>> smaliLineMap = smaliFile.getFirstWordSmaliLineMap();
 
@@ -130,12 +190,29 @@ public class MainClass {
             }
 
             // Obfuscate methods (method name change)
-            ArrayList<SmaliMethod> fileMethods = new ArrayList<>(smaliFile.getChildMethodList());
-            for(SmaliMethod smaliMethod: fileMethods) {
+            ArrayList<SmaliMethod> fileMethods = new ArrayList<>(smaliFile.getMethodList());
+            for (SmaliMethod smaliMethod : fileMethods) {
                 obfuscateMethod(smaliMethod);
             }
 
-            // Obfuscate classes (class name change)
+            // obfuscate fields (field name change)
+            ArrayList<SmaliField> fileFields = new ArrayList<>(smaliFile.getFieldList());
+            for (SmaliField smaliField : fileFields) {
+                smaliField.changeFieldName();
+            }
+
+            // TODO: Obfuscate classes (class name change)
+
+            // remove debugging lines
+            // String[] ignoreStart = new String[]{".line", ".local", ".param", "#"};
+            String[] ignoreStart = new String[]{".line", "#"};
+            for (String is : ignoreStart) {
+                if (smaliLineMap.containsKey(is)) {
+                    for (SmaliLine sl : smaliLineMap.get(is)) {
+                        // sl.delete();
+                    }
+                }
+            }
 
             // other...
         }

@@ -28,16 +28,10 @@ public class SmaliLine {
     public static final String DOUBLE_SPACE = "        ";
     public static final String TRIPLE_SPACE = "            ";
 
-    public static final boolean IGNORE = false;
-    public static final Set<String> IGNORE_START_LINES = new HashSet<>(Arrays.asList(".line", ".local", ".param", "#"));
-
     private String text;
     private String whitespace; // how much whitespace is at the beg of text
 
     private String[] parts;
-
-    // should this line be ignored? lines like .local and .line should be (makes it harder to understand)
-    private boolean ignore = false;
 
     private final SmaliFile parentFile;
     private SmaliMethod parentMethod = null; // is this line in a method?
@@ -74,9 +68,6 @@ public class SmaliLine {
         } else {
             // nothing special? IDK, just split by spaces
             parts = trimmed.split("\\s+");
-        }
-        if (parts.length > 0 && IGNORE) {
-            this.ignore = SmaliLine.IGNORE_START_LINES.contains(parts[0]);
         }
 
         this.referenceSmaliFileList.clear();
@@ -120,6 +111,7 @@ public class SmaliLine {
                     } else {
                         // field
                         storedRef = referenced.getFieldReferences();
+                        referenceTo = referenceTo.substring(0, referenceTo.indexOf(":"));
                     }
 
                     if (!storedRef.containsKey(referenceTo)) {
@@ -257,7 +249,6 @@ public class SmaliLine {
         return "SmaliLine{" +
                 "originalText='" + text + '\'' +
                 ", parts=" + Arrays.toString(parts) +
-                ", ignore=" + ignore +
                 ", parentFile=" + parentFile +
                 '}';
     }

@@ -1,10 +1,6 @@
 package com.oscar0812.obfuscation.smali;
 
-import org.apache.commons.lang3.StringUtils;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.*;
 
 public class SmaliMethod {
     private boolean ended;
@@ -13,8 +9,7 @@ public class SmaliMethod {
     private SmaliLine firstSmaliLine; // .method ...
     private SmaliLine lastSmaliLine = null; // .end method ...
 
-    private boolean isConstructor = false;
-    private String[] accessSpecifiers = null;
+    private final Set<String> accessSpecifiers = new HashSet<>();
     private String methodName;
     private String methodParameterStr;
     private String[] methodParameterArr; // how to hold parameters? just like this for now
@@ -23,7 +18,7 @@ public class SmaliMethod {
     // onCreate(Landroid/os/Bundle;)V
     private String methodIdentifier = null;
 
-    private String oldMethodIdentifier = null;
+    String methodType = "direct"; // direct or virtual or idk what else
 
     // parentFile is the file which this method resides: onCreate()'s parentFile is MainActivity.smali
     // firstLine: .method protected onCreate(Landroid/os/Bundle;)V
@@ -36,16 +31,13 @@ public class SmaliMethod {
         this.firstSmaliLine = firstSmaliLine;
         this.firstSmaliLine.setParentMethod(this);
 
-        // check if already renamed
-        this.oldMethodIdentifier = this.methodIdentifier;
-
         String[] parts = firstSmaliLine.getParts();
+        this.accessSpecifiers.clear();
 
         // "default" access modifier: .method mName()V
         if (parts.length > 2) {
             // ["public"], ["public", "static", "final"], ["private"], etc..
-            this.accessSpecifiers = Arrays.copyOfRange(parts, 1, parts.length - 1);
-            this.isConstructor = accessSpecifiers[accessSpecifiers.length - 1].equals("constructor");
+            Collections.addAll(this.accessSpecifiers, Arrays.copyOfRange(parts, 1, parts.length - 1));
         }
 
         // onCreate(Landroid/os/Bundle;)V
@@ -67,24 +59,29 @@ public class SmaliMethod {
     }
 
     private String getAvailableID() {
+        Set<String> takenIDs = new HashSet<>(this.getParentFile().getMethodMap().keySet());
+        for (SmaliFile smaliFile : this.getParentFile().getMarriedFileMap().values()) {
+            takenIDs.addAll(smaliFile.getMethodMap().keySet());
+        }
+
         String id;
 
         for (char x = 97; x <= 122; x++) {
-            for (int y = 1; y < 8; y++) {
-                id = ((x + "").repeat(y)) + "(" + this.methodParameterStr + ")";
-                if (!this.getParentFile().getChildMethodWithNoReturnMap().containsKey(id)) {
+            for (int y = 1; y < 32; y++) {
+                id = (this.getMethodType() + (x + "").repeat(y)) + "(" + this.methodParameterStr + ")";
+                if (!takenIDs.contains(id)) {
                     // new method!
                     return id + methodReturnType;
                 }
             }
         }
 
-
         return "";
     }
 
     // return the new identifier
-    public void changeMethodName(ArrayList<SmaliLine> smaliLinesPointingToThisMethod) {
+    public void changeMethodName() {
+        ArrayList<SmaliLine> smaliLinesPointingToThisMethod = this.getParentFile().getMethodReferences().get(this.getMethodIdentifier());
         // 1. get new method name
         String[] parts = this.firstSmaliLine.getParts();
         StringBuilder builder = new StringBuilder(firstSmaliLine.getWhitespace());
@@ -94,10 +91,21 @@ public class SmaliMethod {
             builder.append(" ");
         }
 
-        String oldMethodID = this.methodIdentifier;
+        String oldMethodID = this.getMethodIdentifier();
         String oldMethodIDNoReturn = oldMethodID.substring(0, oldMethodID.indexOf(")") + 1);
         String newMethodID = getAvailableID();
+
+        for (SmaliFile implementsParent : this.getParentFile().getParentFileMap().values()) {
+            // has a parent (.implements)
+            if (implementsParent.getMethodNameChange().containsKey(oldMethodIDNoReturn)) {
+                newMethodID = implementsParent.getMethodNameChange().get(oldMethodIDNoReturn) + this.methodReturnType;
+                break;
+            }
+        }
+
         String newMethodIDNoReturn = newMethodID.substring(0, newMethodID.indexOf(")") + 1);
+
+        this.getParentFile().getMethodNameChange().put(oldMethodIDNoReturn, newMethodIDNoReturn);
 
         builder.append(newMethodID);
 
@@ -108,16 +116,15 @@ public class SmaliMethod {
         this.setFirstSmaliLine(newFirstLine);
 
         // 3. unlink method name from parent file
-        HashMap<String, SmaliMethod> map = this.getParentFile().getChildMethodWithNoReturnMap();
+        HashMap<String, SmaliMethod> map = this.getParentFile().getMethodMap();
         map.put(newMethodIDNoReturn, map.remove(oldMethodIDNoReturn));
 
         // 4. change all lines that called this method by the old name
-        for (SmaliLine smaliLine: smaliLinesPointingToThisMethod) {
-            String replaceThis = this.getParentFile().getSmaliPackage()+"->"+oldMethodID;
-            String newText = this.getParentFile().getSmaliPackage()+"->"+newMethodID;
+        for (SmaliLine smaliLine : smaliLinesPointingToThisMethod) {
+            String replaceThis = this.getParentFile().getSmaliPackage() + "->" + oldMethodID;
+            String newText = this.getParentFile().getSmaliPackage() + "->" + newMethodID;
             String text = smaliLine.getText();
             smaliLine.setText(text.replace(replaceThis, newText));
-            int aa =1;
         }
     }
 
@@ -141,6 +148,22 @@ public class SmaliMethod {
         }
     }
 
+    public void setMethodType(String methodType) {
+        this.methodType = methodType;
+    }
+
+    public String getMethodType() {
+        return methodType;
+    }
+
+    public boolean isDirect() {
+        return this.methodType.equals("direct");
+    }
+
+    public boolean isVirtual() {
+        return this.methodType.equals("virtual");
+    }
+
     public SmaliLine getFirstSmaliLine() {
         return firstSmaliLine;
     }
@@ -150,15 +173,21 @@ public class SmaliMethod {
     }
 
     public boolean isConstructor() {
-        return isConstructor;
+        return accessSpecifiers.contains("constructor");
     }
 
-    public String[] getAccessSpecifiers() {
+    public boolean isSynthetic() {
+        return accessSpecifiers.contains("synthetic");
+    }
+
+    public boolean canRename() {
+        // TODO: make renaming virtual methods possible:
+        // renaming parent - child functions messes up stuff, but how do I check all parents???
+        return !isConstructor() && !isSynthetic() && !isVirtual();
+    }
+
+    public Set<String> getAccessSpecifiers() {
         return accessSpecifiers;
-    }
-
-    public String getOldMethodIdentifier() {
-        return oldMethodIdentifier;
     }
 
     public String getMethodName() {
@@ -192,10 +221,10 @@ public class SmaliMethod {
                 ", parentFile=" + parentFile +
                 ", firstSmaliLine=" + firstSmaliLine +
                 ", lastSmaliLine=" + lastSmaliLine +
-                ", isConstructor=" + isConstructor +
-                ", accessSpecifiers=" + Arrays.toString(accessSpecifiers) +
+                ", accessSpecifiers=" + accessSpecifiers +
                 ", methodName='" + methodName + '\'' +
-                ", methodParameters=" + Arrays.toString(methodParameterArr) +
+                ", methodParameterStr='" + methodParameterStr + '\'' +
+                ", methodParameterArr=" + Arrays.toString(methodParameterArr) +
                 ", methodReturnType='" + methodReturnType + '\'' +
                 ", methodIdentifier='" + methodIdentifier + '\'' +
                 '}';
