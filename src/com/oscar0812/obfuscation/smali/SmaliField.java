@@ -4,7 +4,6 @@ import com.oscar0812.obfuscation.APKInfo;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Set;
 
 /***
@@ -15,10 +14,10 @@ import java.util.Set;
  .field <access rights> [modification keyword]<field name>:<field type> [= value]
  */
 
-public class SmaliField {
+public class SmaliField implements SmaliBlock{
     private SmaliLine smaliLine;
 
-    private String fieldName;
+    private String identifier; // field name
     private String fieldType;
     private int indexOfField = -1;  // <field name>:<field type>
     private String value = null;
@@ -40,7 +39,7 @@ public class SmaliField {
 
         assert indexOfField >= 0;
         int cIndex = parts[indexOfField].indexOf(":");
-        fieldName = parts[indexOfField].substring(0, cIndex);
+        identifier = parts[indexOfField].substring(0, cIndex);
         fieldType = parts[indexOfField].substring(cIndex + 1);
 
         if (indexOfField + 1 < parts.length) {
@@ -49,35 +48,29 @@ public class SmaliField {
         }
     }
 
-    private String getAvailableID() {
-        Set<String> takenIDs = new HashSet<>(this.getSmaliLine().getParentFile().getFieldMap().keySet());
-        for (SmaliFile parentSmaliFile : this.getSmaliLine().getParentFile().getParentFileMap().values()) {
-            for(String fieldName: parentSmaliFile.getFieldMap().keySet()) {
-                if(parentSmaliFile.getFieldNameChange().containsKey(this.getFieldName())) {
-                    return parentSmaliFile.getFieldNameChange().get(this.getFieldName());
-                }
-                takenIDs.add(fieldName);
-            }
+    @Override
+    public SmaliFile getParentFile() {
+        return this.getSmaliLine().getParentFile();
+    }
+
+    @Override
+    public Set<String> getMapKeys(SmaliFile smaliFile) {
+        return smaliFile.getFieldMap().keySet();
+    }
+
+    @Override
+    public HashMap<String, String> parentNameChanges() {
+        HashMap<String, String> changes = new HashMap<>();
+        for(SmaliFile parentFile: this.getParentFile().getParentFileMap().values()) {
+            changes.putAll(parentFile.getFieldNameChange());
         }
-
-        String id;
-
-        for (char x = 97; x <= 122; x++) {
-            for (int y = 1; y < 32; y++) {
-                id = ((x + "").repeat(y));
-                if (!takenIDs.contains(id)) {
-                    // new field!
-                    return id;
-                }
-            }
-        }
-
-        return "";
+        return changes;
     }
 
     // return the new identifier
-    public void changeFieldName() {
-        // 1. get new method name
+    @Override
+    public void rename() {
+        // 1. get new field name
         String[] parts = this.getSmaliLine().getParts();
         StringBuilder builder = new StringBuilder(this.getSmaliLine().getWhitespace());
 
@@ -86,16 +79,16 @@ public class SmaliField {
             builder.append(" ");
         }
 
-        String oldFieldName = this.getFieldName();
+        String oldFieldName = this.getIdentifier();
         String newFieldName = getAvailableID();
 
         builder.append(newFieldName).append(":").append(this.getFieldType());
 
-        if(getIndexOfField() + 1 < parts.length) {
+        if (getIndexOfField() + 1 < parts.length) {
             builder.append(" ");
         }
 
-        for(int x = getIndexOfField() + 1; x<parts.length; x++) {
+        for (int x = getIndexOfField() + 1; x < parts.length; x++) {
             builder.append(parts[x]);
             builder.append(" ");
         }
@@ -115,13 +108,13 @@ public class SmaliField {
         // 4. change all lines that called this method by the old name
         ArrayList<SmaliLine> smaliLinesPointingToThisField = this.getSmaliLine().getParentFile().getFieldReferences().get(oldFieldName);
 
-        if(smaliLinesPointingToThisField == null) {
+        if (smaliLinesPointingToThisField == null) {
             smaliLinesPointingToThisField = new ArrayList<>();
         }
 
         // child files may refer to parent file fields
-        for(SmaliFile childFile: this.getSmaliLine().getParentFile().getChildFileMap().values()) {
-            if(childFile.getFieldReferences().containsKey(oldFieldName)) {
+        for (SmaliFile childFile : this.getSmaliLine().getParentFile().getChildFileMap().values()) {
+            if (childFile.getFieldReferences().containsKey(oldFieldName)) {
                 smaliLinesPointingToThisField.addAll(childFile.getFieldReferences().get(oldFieldName));
             }
         }
@@ -151,8 +144,9 @@ public class SmaliField {
         return indexOfField;
     }
 
-    public String getFieldName() {
-        return fieldName;
+    @Override
+    public String getIdentifier() {
+        return identifier;
     }
 
     public String getFieldType() {

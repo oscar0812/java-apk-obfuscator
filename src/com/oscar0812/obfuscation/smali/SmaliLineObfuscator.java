@@ -3,6 +3,7 @@ package com.oscar0812.obfuscation.smali;
 import com.oscar0812.obfuscation.APKInfo;
 import com.oscar0812.obfuscation.utils.StringUtils;
 
+import java.io.File;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -19,15 +20,38 @@ public class SmaliLineObfuscator {
 
     private final HashMap<String, SmaliFile> obfFileMap = new HashMap<>();
     private final ArrayList<String> obfFilePaths = new ArrayList<>();
+    private final HashMap<String, Integer> methodNumber = new HashMap<>();
+    private final HashMap<String, Set<String>> dirFiles = new HashMap<>();
+
+    private static Set<String> smaliFilesInDir(File dir) {
+        Set<String> filePaths = new HashSet<>();
+        for (File f : dir.listFiles()) {
+            if (!f.isDirectory() && f.getName().endsWith(".smali")) {
+                filePaths.add(f.getAbsolutePath());
+            }
+        }
+
+        return filePaths;
+    }
 
     private SmaliFile createNewFile(SmaliFile siblingFile) {
         // create a file with a name that doesn't exist in the same directory as siblingFile
-        SmaliFile file;
+        File parent = siblingFile.getParentFile();
+        if(!dirFiles.containsKey(parent.getAbsolutePath())) {
+            dirFiles.put(parent.getAbsolutePath(), smaliFilesInDir(parent));
+        }
+        Set<String> filePaths = dirFiles.get(parent.getAbsolutePath());
+
+        ArrayList<String> permutations = StringUtils.getStringPermutations();
         String fileClassName;
+        int index = 0;
         do {
-            fileClassName = StringUtils.getRandomUniqueString();
-            file = new SmaliFile(siblingFile.getParentFile(), fileClassName + ".smali");
-        } while (file.exists());
+            fileClassName = permutations.get(index++);
+        } while (filePaths.contains(fileClassName + ".smali"));
+
+        filePaths.add(fileClassName + ".smali");
+
+        SmaliFile file = new SmaliFile(siblingFile.getParentFile(), fileClassName + ".smali");
 
         String sp = siblingFile.getSmaliPackage();           // Lcom/oscar0812/sample_navigation/BuildConfig;
         sp = sp.substring(0, sp.lastIndexOf("/") + 1);      // Lcom/oscar0812/sample_navigation/
@@ -131,10 +155,8 @@ public class SmaliLineObfuscator {
     // move-result-object v0
     public SmaliLine stringToStaticCall(SmaliLine inLine) {
         String register = inLine.getParts()[1].replace(",", ""); // v0, => v0
-        String methodName = StringUtils.getRandomUniqueString();
 
         int randomNum = ThreadLocalRandom.current().nextInt(0, obfFilePaths.size() + 2);
-        // int randomNum = 0;
 
         SmaliFile obfFile;
         if (randomNum >= obfFilePaths.size()) {
@@ -143,7 +165,15 @@ public class SmaliLineObfuscator {
             obfFile = obfFileMap.get(obfFilePaths.get(randomNum));
         }
 
+        ArrayList<String> permutations = StringUtils.getStringPermutations();
+        if (!methodNumber.containsKey(obfFile.getAbsolutePath())) {
+            methodNumber.put(obfFile.getAbsolutePath(), 0);
+        }
+
+        String methodName = permutations.get(methodNumber.get(obfFile.getAbsolutePath()));
         appendMethod(obfFile, inLine, methodName);
+
+        methodNumber.put(obfFile.getAbsolutePath(), methodNumber.get(obfFile.getAbsolutePath()) + 1);
 
         // add this to the apk (IT IS PART OF IT NOW!)
         APKInfo.getInstance().addSmaliFile(obfFile);

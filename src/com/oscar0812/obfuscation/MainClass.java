@@ -64,7 +64,10 @@ public class MainClass {
         at.favre.tools.apksigner.SignTool.main(sign_params);
     }
 
-    private void connectParents(ArrayList<SmaliFile> arr) {
+    // connect file to parent of parent of parent of...
+    // and to child of child of ...
+    // and to other files that have children together
+    private void connectSmaliFileParents(ArrayList<SmaliFile> arr) {
         // bubble up to parents with no children
         ArrayList<SmaliFile> parents = new ArrayList<>();
         for (SmaliFile smaliFile : arr) {
@@ -121,7 +124,14 @@ public class MainClass {
         }
     }
 
-    private void obfuscateStrings(ArrayList<SmaliLine> smaliLines, SmaliLineObfuscator slo) {
+    private void obfuscateStrings(SmaliFile smaliFile) {
+        HashMap<String, ArrayList<SmaliLine>> smaliLineMap = smaliFile.getFirstWordSmaliLineMap();
+
+        if (!smaliLineMap.containsKey("const-string")) {
+            return;
+        }
+        ArrayList<SmaliLine> smaliLines = smaliLineMap.get("const-string");
+
         // obfuscate strings
         // DOESN'T WORK: line 16 of SongLoader: "is_music=1 AND title != \'\'"
         for (SmaliLine smaliLine : smaliLines) {
@@ -135,7 +145,7 @@ public class MainClass {
                 SmaliMethod smaliMethod = smaliLine.getParentMethod();
                 if (!smaliMethod.isConstructor()) {
                     // dont obfuscate constructor string (for now)
-                    SmaliLine obfCall = slo.stringToStaticCall(smaliLine);
+                    SmaliLine obfCall = SmaliLineObfuscator.getInstance().stringToStaticCall(smaliLine);
                     smaliLine.getPrevSmaliLine().insertAfter(obfCall);
                     smaliLine.delete();
                 }
@@ -143,18 +153,29 @@ public class MainClass {
         }
     }
 
-    private void obfuscateMethod(SmaliMethod smaliMethod) {
-        if (!smaliMethod.canRename()) {
-            // can't rename constructors
-            return;
+    private void obfuscateMethods(SmaliFile smaliFile) {
+        ArrayList<SmaliMethod> fileMethods = new ArrayList<>(smaliFile.getMethodList());
+        for (SmaliMethod smaliMethod : fileMethods) {
+            smaliMethod.rename();
         }
+    }
 
-        HashMap<String, ArrayList<SmaliLine>> methodReferenceMap = smaliMethod.getParentFile().getMethodReferences();
+    private void obfuscateFields(SmaliFile smaliFile) {
+        ArrayList<SmaliField> fileFields = new ArrayList<>(smaliFile.getFieldList());
+        for (SmaliField smaliField : fileFields) {
+            smaliField.rename();
+        }
+    }
 
-        if (methodReferenceMap.containsKey(smaliMethod.getMethodIdentifier())) {
-            // this file created this method and lines are calling it
-            // what about parent class method overriding? will that be an issue?
-            smaliMethod.changeMethodName();
+    private void deleteDebugLines(SmaliFile smaliFile) {
+        HashMap<String, ArrayList<SmaliLine>> smaliLineMap = smaliFile.getFirstWordSmaliLineMap();
+        String[] ignoreStart = new String[]{".line", "#"};
+        for (String is : ignoreStart) {
+            if (smaliLineMap.containsKey(is)) {
+                for (SmaliLine sl : smaliLineMap.get(is)) {
+                    sl.delete();
+                }
+            }
         }
     }
 
@@ -162,19 +183,19 @@ public class MainClass {
     public void obfuscate() {
 
         // TODO: read the files in parallel to finish faster (might be alot of files)
-        for (SmaliFile sf : APKInfo.getInstance().getSmaliFileList()) {
+        for (SmaliFile sf : APKInfo.getInstance().getSmaliFileMap().values()) {
             sf.processLines();
         }
 
-        ArrayList<SmaliFile> copy = new ArrayList<>(APKInfo.getInstance().getSmaliFileList()); // since it changes
+        ArrayList<SmaliFile> smaliFiles = new ArrayList<>(APKInfo.getInstance().getSmaliFileMap().values()); // since it changes
 
         // sort, put parent files first
-        copy.sort((a, b) -> Integer.compare(b.getChildFileMap().size(), a.getChildFileMap().size()));
+        smaliFiles.sort((a, b) -> Integer.compare(b.getChildFileMap().size(), a.getChildFileMap().size()));
 
-        connectParents(copy);
+        connectSmaliFileParents(smaliFiles);
 
         // all lines are processed, time to obfuscate
-        for (SmaliFile smaliFile : copy) {
+        for (SmaliFile smaliFile : smaliFiles) {
 
             if(APKInfo.getInstance().getRFileMap().containsKey(smaliFile.getAbsolutePath())) {
                 // don't obfuscate R files, we need them intact for xml obfuscation
@@ -182,43 +203,34 @@ public class MainClass {
             }
 
             // System.out.println("\"" + smaliFile.getAbsolutePath() + "\",");
-            HashMap<String, ArrayList<SmaliLine>> smaliLineMap = smaliFile.getFirstWordSmaliLineMap();
 
-            // Obfuscate strings
-            if (smaliLineMap.containsKey("const-string")) {
-                obfuscateStrings(smaliLineMap.get("const-string"), SmaliLineObfuscator.getInstance());
-            }
-
-            // Obfuscate methods (method name change)
-            ArrayList<SmaliMethod> fileMethods = new ArrayList<>(smaliFile.getMethodList());
-            for (SmaliMethod smaliMethod : fileMethods) {
-                obfuscateMethod(smaliMethod);
-            }
-
-            // obfuscate fields (field name change)
-            ArrayList<SmaliField> fileFields = new ArrayList<>(smaliFile.getFieldList());
-            for (SmaliField smaliField : fileFields) {
-                smaliField.changeFieldName();
-            }
-
+            obfuscateStrings(smaliFile);
+            obfuscateMethods(smaliFile);
+            obfuscateFields(smaliFile);
+            // deleteDebugLines(smaliFile);
             // TODO: Obfuscate classes (class name change)
-
-            // remove debugging lines
-            // String[] ignoreStart = new String[]{".line", ".local", ".param", "#"};
-            String[] ignoreStart = new String[]{".line", "#"};
-            for (String is : ignoreStart) {
-                if (smaliLineMap.containsKey(is)) {
-                    for (SmaliLine sl : smaliLineMap.get(is)) {
-                        // sl.delete();
-                    }
-                }
-            }
 
             // other...
         }
 
+        // obfuscate R files and XML
+        StringBuilder currentName = new StringBuilder();
+
+        ArrayList<SmaliField> RFieldList = new ArrayList<>();
+        HashMap<String, ArrayList<SmaliField>> RFieldMap = new HashMap<>();
+
+        for(SmaliFile smaliFile: APKInfo.getInstance().getRFileMap().values()) {
+            for(SmaliField smaliField : smaliFile.getFieldList()) {
+                RFieldList.add(smaliField);
+                if(!RFieldMap.containsKey(smaliField.getIdentifier())) {
+                    RFieldMap.put(smaliField.getIdentifier(), new ArrayList<>());
+                }
+                RFieldMap.get(smaliField.getIdentifier()).add(smaliField);
+            }
+        }
+
         // save
-        for (SmaliFile smaliFile : APKInfo.getInstance().getSmaliFileList()) {
+        for (SmaliFile smaliFile : APKInfo.getInstance().getSmaliFileMap().values()) {
             smaliFile.saveToDisk();
         }
 
@@ -227,6 +239,7 @@ public class MainClass {
 
     private void start() {
         APKInfo.setApkName("timber.apk");
+
         // APKInfo.setApkName("sample_navigation.apk");
         APKInfo info = APKInfo.getInstance();
         File apkFile = info.getApkFile();

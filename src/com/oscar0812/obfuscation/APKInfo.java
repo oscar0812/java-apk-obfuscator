@@ -22,7 +22,6 @@ public class APKInfo {
     private final HashMap<String, SmaliFile> RFileMap = new HashMap<>();
 
     private final HashMap<String, SmaliFile> smaliFileMap = new HashMap<>();
-    private final ArrayList<SmaliFile> smaliFileList = new ArrayList<>();
 
     private final ArrayList<File> manifestAppFileList = new ArrayList<>();
     private final HashMap<String, File> manifestAppFileMap = new HashMap<>();
@@ -88,16 +87,10 @@ public class APKInfo {
         return smaliFileMap;
     }
 
-    public ArrayList<SmaliFile> getSmaliFileList() {
-        return smaliFileList;
-    }
-
     public void addSmaliFile(SmaliFile smaliFile) {
         // quick access through path
-        if(!this.smaliFileMap.containsKey(smaliFile.getAbsolutePath())) {
-            this.smaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
-            this.smaliFileList.add(smaliFile);
-        }
+        assert !this.smaliFileMap.containsKey(smaliFile.getAbsolutePath());
+        this.smaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
     }
 
     public void fetchDecompiledInfo() {

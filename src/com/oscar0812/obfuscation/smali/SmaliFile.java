@@ -134,7 +134,7 @@ public class SmaliFile extends File {
     public void addFieldLine(SmaliLine smaliLine) {
         SmaliField sf = new SmaliField(smaliLine);
         fieldList.add(sf);
-        fieldMap.put(sf.getFieldName(), sf);
+        fieldMap.put(sf.getIdentifier(), sf);
     }
 
     public void addMethodLine(SmaliLine smaliLine) {
@@ -149,7 +149,7 @@ public class SmaliFile extends File {
             methodList.add(sm);
 
             // update the hashmap, to search for method faster by name
-            String id = sm.getMethodIdentifier();
+            String id = sm.getIdentifier();
             methodMap.put(id.substring(0, id.indexOf(")") + 1), sm);
         } else if (methodList.size() > 0 && !methodList.get(methodList.size() - 1).isEnded()) {
             // this line is part of a method
@@ -237,5 +237,9 @@ public class SmaliFile extends File {
 
     public HashMap<String, SmaliFile> getMarriedFileMap() {
         return marriedFileMap;
+    }
+
+    public boolean isAbstract() {
+        return this.getFirstWordSmaliLineMap().get(".class").get(0).getPartsSet().contains("abstract");
     }
 }

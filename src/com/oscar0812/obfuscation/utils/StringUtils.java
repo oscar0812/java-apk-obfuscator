@@ -1,37 +1,47 @@
 package com.oscar0812.obfuscation.utils;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class StringUtils {
-    private static final Set<String> stringsUsed = new HashSet<>();
+    private static final ArrayList<String> stringPermutations = new ArrayList<>();
 
-    public static String getRandomUniqueString() {
-        String alphabet = "abcdefghijklmnopqrstuvwxyz";
-        StringBuilder builder = new StringBuilder();
-        int length = 2;
-        int tries = 0;
-        do {
-            // collisions, make it longer
-            if (tries > 0 && tries % 5 == 0) {
-                length += 1;
+    private static void getAllStringsOfKLength(String prefix, int k, ArrayList<String> arrayList)
+    {
+        // Base case: k is 0,
+        // print prefix
+        if (k == 0)
+        {
+            arrayList.add(prefix);
+            return;
+        }
+
+        // One by one add all characters
+        // from set and recursively
+        // call for k equals to k-1
+        for (int i = 97; i <= 122; ++i)
+        {
+
+            // Next character of input added
+            String newPrefix = prefix + (char) i;
+
+            // k is decreased, because
+            // we have added a new character
+            getAllStringsOfKLength(newPrefix,k - 1, arrayList);
+        }
+    }
+
+    public static ArrayList<String> getStringPermutations() {
+        if(stringPermutations.size() == 0) {
+            for (int x = 1; x<=5; x++) {
+                getAllStringsOfKLength("", x, stringPermutations);
             }
-            tries++;
+        }
 
-            // clear out string builder
-            builder.setLength(0);
-            // make a random string
-            for (int x = 0; x < length; x++) {
-                int randomNum = ThreadLocalRandom.current().nextInt(0, alphabet.length());
-                builder.append(alphabet.charAt(randomNum));
-            }
-        } while (stringsUsed.contains(builder.toString()));
-
-        stringsUsed.add(builder.toString());
-
-        return builder.toString();
+        return stringPermutations;
     }
 
     // value = Lcom/oscar0812/sample_navigation/MainActivity;->onCreate(Landroid/os/Bundle;)V
@@ -70,16 +80,5 @@ public class StringUtils {
             }
         }
         return wsb.toString();
-    }
-
-    public static ArrayList<Integer> getIndicesOf(String text, String c) {
-        int index = text.indexOf(c);
-        ArrayList<Integer> indices = new ArrayList<>();
-        while (index>= 0) {
-            indices.add(index);
-            index = text.indexOf(c, index+1);
-        }
-
-        return indices;
     }
 }

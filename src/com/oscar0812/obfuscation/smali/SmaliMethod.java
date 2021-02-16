@@ -2,21 +2,20 @@ package com.oscar0812.obfuscation.smali;
 
 import java.util.*;
 
-public class SmaliMethod {
+public class SmaliMethod implements SmaliBlock {
     private boolean ended;
     private final SmaliFile parentFile;
 
     private SmaliLine firstSmaliLine; // .method ...
     private SmaliLine lastSmaliLine = null; // .end method ...
 
-    private final Set<String> accessSpecifiers = new HashSet<>();
     private String methodName;
     private String methodParameterStr;
     private String[] methodParameterArr; // how to hold parameters? just like this for now
     private String methodReturnType;
 
     // onCreate(Landroid/os/Bundle;)V
-    private String methodIdentifier = null;
+    private String identifier = null;
 
     String methodType = "direct"; // direct or virtual or idk what else
 
@@ -32,99 +31,103 @@ public class SmaliMethod {
         this.firstSmaliLine.setParentMethod(this);
 
         String[] parts = firstSmaliLine.getParts();
-        this.accessSpecifiers.clear();
-
-        // "default" access modifier: .method mName()V
-        if (parts.length > 2) {
-            // ["public"], ["public", "static", "final"], ["private"], etc..
-            Collections.addAll(this.accessSpecifiers, Arrays.copyOfRange(parts, 1, parts.length - 1));
-        }
 
         // onCreate(Landroid/os/Bundle;)V
-        this.methodIdentifier = parts[parts.length - 1];
+        String last = parts[parts.length - 1];
+        this.identifier = last.substring(0, last.lastIndexOf(")") + 1);
 
         // onCreate
-        this.methodName = methodIdentifier.substring(0, methodIdentifier.indexOf("("));
+        this.methodName = last.substring(0, last.indexOf("("));
 
         // get string in (...)
-        int firstBracket = methodIdentifier.indexOf('(');
+        int firstBracket = last.indexOf('(');
         // Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;
-        this.methodParameterStr = methodIdentifier.substring(firstBracket + 1, methodIdentifier.indexOf(')', firstBracket));
+        this.methodParameterStr = last.substring(firstBracket + 1, last.indexOf(')', firstBracket));
         // ["Landroid/view/LayoutInflater", "Landroid/view/ViewGroup", "Landroid/os/Bundle"]
         this.methodParameterArr = this.methodParameterStr.split(";");
 
         // the return is after the )
         // Landroid/view/View
-        this.methodReturnType = methodIdentifier.substring(methodIdentifier.indexOf(")") + 1);
+        this.methodReturnType = last.substring(last.indexOf(")") + 1);
     }
 
-    private String getAvailableID() {
-        Set<String> takenIDs = new HashSet<>(this.getParentFile().getMethodMap().keySet());
-        for (SmaliFile smaliFile : this.getParentFile().getMarriedFileMap().values()) {
-            takenIDs.addAll(smaliFile.getMethodMap().keySet());
-        }
-
-        String id;
-
-        for (char x = 97; x <= 122; x++) {
-            for (int y = 1; y < 32; y++) {
-                id = (this.getMethodType() + (x + "").repeat(y)) + "(" + this.methodParameterStr + ")";
-                if (!takenIDs.contains(id)) {
-                    // new method!
-                    return id + methodReturnType;
-                }
-            }
-        }
-
-        return "";
+    @Override
+    public SmaliFile getParentFile() {
+        return parentFile;
     }
 
-    // return the new identifier
-    public void changeMethodName() {
-        ArrayList<SmaliLine> smaliLinesPointingToThisMethod = this.getParentFile().getMethodReferences().get(this.getMethodIdentifier());
-        // 1. get new method name
-        String[] parts = this.firstSmaliLine.getParts();
-        StringBuilder builder = new StringBuilder(firstSmaliLine.getWhitespace());
+    @Override
+    public Set<String> getMapKeys(SmaliFile smaliFile) {
+        return smaliFile.getMethodMap().keySet();
+    }
+
+    @Override
+    public HashMap<String, String> parentNameChanges() {
+        HashMap<String, String> changes = new HashMap<>();
+        for (SmaliFile parentFile : this.getParentFile().getParentFileMap().values()) {
+            changes.putAll(parentFile.getMethodNameChange());
+        }
+        return changes;
+    }
+
+    @Override
+    public String appendAfterName() {
+        return "(" + this.methodParameterStr + ")";
+    }
+
+    @Override
+    public void rename() {
+        if(this.isAbstract()) {
+            int aa = 1;
+        }
+
+        String oldMethodID = this.getIdentifier();
+        String newMethodID;
+        HashMap<String, String> nameChanges = parentNameChanges();
+        if (nameChanges.containsKey(this.getIdentifier())) {
+            newMethodID = nameChanges.get(this.getIdentifier());
+        } else if (!this.canRename()) { // this.isConstructor() || this.isSynthetic()) {
+            // don't rename these
+            return;
+        } else {
+            // 1. get new method name
+            newMethodID = getAvailableID();
+        }
+
+        String[] parts = this.getFirstSmaliLine().getParts();
+        StringBuilder builder = new StringBuilder(this.getFirstSmaliLine().getWhitespace());
 
         for (int x = 0; x < parts.length - 1; x++) {
             builder.append(parts[x]);
             builder.append(" ");
         }
-
-        String oldMethodID = this.getMethodIdentifier();
-        String oldMethodIDNoReturn = oldMethodID.substring(0, oldMethodID.indexOf(")") + 1);
-        String newMethodID = getAvailableID();
-
-        for (SmaliFile implementsParent : this.getParentFile().getParentFileMap().values()) {
-            // has a parent (.implements)
-            if (implementsParent.getMethodNameChange().containsKey(oldMethodIDNoReturn)) {
-                newMethodID = implementsParent.getMethodNameChange().get(oldMethodIDNoReturn) + this.methodReturnType;
-                break;
-            }
-        }
-
-        String newMethodIDNoReturn = newMethodID.substring(0, newMethodID.indexOf(")") + 1);
-
-        this.getParentFile().getMethodNameChange().put(oldMethodIDNoReturn, newMethodIDNoReturn);
-
-        builder.append(newMethodID);
+        builder.append(newMethodID).append(this.getMethodReturnType());
 
         // 2. make a new method start line
         SmaliLine newFirstLine = new SmaliLine(builder.toString(), this.getParentFile());
-        this.firstSmaliLine.getPrevSmaliLine().insertAfter(newFirstLine);
-        this.firstSmaliLine.delete();
+        this.getFirstSmaliLine().getPrevSmaliLine().insertAfter(newFirstLine);
+        this.getFirstSmaliLine().delete();
         this.setFirstSmaliLine(newFirstLine);
+
+        this.getParentFile().getMethodNameChange().put(oldMethodID, newMethodID);
 
         // 3. unlink method name from parent file
         HashMap<String, SmaliMethod> map = this.getParentFile().getMethodMap();
-        map.put(newMethodIDNoReturn, map.remove(oldMethodIDNoReturn));
+        map.put(newMethodID, map.remove(oldMethodID));
 
-        // 4. change all lines that called this method by the old name
-        for (SmaliLine smaliLine : smaliLinesPointingToThisMethod) {
-            String replaceThis = this.getParentFile().getSmaliPackage() + "->" + oldMethodID;
-            String newText = this.getParentFile().getSmaliPackage() + "->" + newMethodID;
-            String text = smaliLine.getText();
-            smaliLine.setText(text.replace(replaceThis, newText));
+        relinkAfterRename(oldMethodID, newMethodID);
+    }
+
+    // re-link all the lines pointing to this method
+    private void relinkAfterRename(String oldMethodID, String newMethodID) {
+        HashMap<String, ArrayList<SmaliLine>> references = this.getParentFile().getMethodReferences();
+        if (references.containsKey(oldMethodID)) {
+            for (SmaliLine smaliLine : new ArrayList<>(references.get(oldMethodID))) {
+                String replaceThis = "->" + oldMethodID + methodReturnType;
+                String newText = "->" + newMethodID + methodReturnType;
+                String text = smaliLine.getText();
+                smaliLine.setText(text.replace(replaceThis, newText));
+            }
         }
     }
 
@@ -173,21 +176,21 @@ public class SmaliMethod {
     }
 
     public boolean isConstructor() {
-        return accessSpecifiers.contains("constructor");
+        return this.getFirstSmaliLine().getPartsSet().contains("constructor");
     }
 
     public boolean isSynthetic() {
-        return accessSpecifiers.contains("synthetic");
+        return this.getFirstSmaliLine().getPartsSet().contains("synthetic");
+    }
+
+    public boolean isAbstract() {
+        return this.getFirstSmaliLine().getPartsSet().contains("abstract");
     }
 
     public boolean canRename() {
         // TODO: make renaming virtual methods possible:
         // renaming parent - child functions messes up stuff, but how do I check all parents???
-        return !isConstructor() && !isSynthetic() && !isVirtual();
-    }
-
-    public Set<String> getAccessSpecifiers() {
-        return accessSpecifiers;
+        return (!isConstructor() && !isSynthetic() && !isVirtual()) || (isAbstract() && getParentFile().isAbstract());
     }
 
     public String getMethodName() {
@@ -206,12 +209,9 @@ public class SmaliMethod {
         return ended;
     }
 
-    public SmaliFile getParentFile() {
-        return parentFile;
-    }
-
-    public String getMethodIdentifier() {
-        return methodIdentifier;
+    @Override
+    public String getIdentifier() {
+        return identifier;
     }
 
     @Override
@@ -221,12 +221,11 @@ public class SmaliMethod {
                 ", parentFile=" + parentFile +
                 ", firstSmaliLine=" + firstSmaliLine +
                 ", lastSmaliLine=" + lastSmaliLine +
-                ", accessSpecifiers=" + accessSpecifiers +
                 ", methodName='" + methodName + '\'' +
                 ", methodParameterStr='" + methodParameterStr + '\'' +
                 ", methodParameterArr=" + Arrays.toString(methodParameterArr) +
                 ", methodReturnType='" + methodReturnType + '\'' +
-                ", methodIdentifier='" + methodIdentifier + '\'' +
+                ", methodIdentifier='" + identifier + '\'' +
                 '}';
     }
 }

@@ -32,6 +32,7 @@ public class SmaliLine {
     private String whitespace; // how much whitespace is at the beg of text
 
     private String[] parts;
+    private Set<String> partsSet = new HashSet<>();
 
     private final SmaliFile parentFile;
     private SmaliMethod parentMethod = null; // is this line in a method?
@@ -69,6 +70,9 @@ public class SmaliLine {
             // nothing special? IDK, just split by spaces
             parts = trimmed.split("\\s+");
         }
+
+        partsSet.clear();
+        Collections.addAll(partsSet, parts);
 
         this.referenceSmaliFileList.clear();
         this.referenceSmaliFileMap.clear();
@@ -108,6 +112,7 @@ public class SmaliLine {
                     if (referenceTo.contains("(") && referenceTo.contains(")")) {
                         // method
                         storedRef = referenced.getMethodReferences();
+                        referenceTo = referenceTo.substring(0, referenceTo.lastIndexOf(")") + 1);
                     } else {
                         // field
                         storedRef = referenced.getFieldReferences();
@@ -137,7 +142,7 @@ public class SmaliLine {
         for (int x = 0; x < parts.length; x++) {
             if (x + 1 == parts.length) {
                 // end
-                if(parts[0].equals("const-string") && !parts[x].startsWith("\"")) {
+                if (parts[0].equals("const-string") && !parts[x].startsWith("\"")) {
                     // const-string needs ""
                     builder.append("\"").append(parts[x]).append("\"");
                 } else {
@@ -158,6 +163,10 @@ public class SmaliLine {
 
     public String[] getParts() {
         return parts;
+    }
+
+    public Set<String> getPartsSet() {
+        return partsSet;
     }
 
     public SmaliFile getParentFile() {
