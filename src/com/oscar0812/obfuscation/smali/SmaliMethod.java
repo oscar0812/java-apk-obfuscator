@@ -86,7 +86,7 @@ public class SmaliMethod implements SmaliBlock {
         HashMap<String, String> nameChanges = parentNameChanges();
         if (nameChanges.containsKey(this.getIdentifier())) {
             newMethodID = nameChanges.get(this.getIdentifier());
-        } else if (!this.canRename()) { // this.isConstructor() || this.isSynthetic()) {
+        } else if (!this.canRename()) {
             // don't rename these
             return;
         } else {

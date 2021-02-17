@@ -14,7 +14,7 @@ import java.util.Set;
  .field <access rights> [modification keyword]<field name>:<field type> [= value]
  */
 
-public class SmaliField implements SmaliBlock{
+public class SmaliField implements SmaliBlock {
     private SmaliLine smaliLine;
 
     private String identifier; // field name
@@ -61,7 +61,7 @@ public class SmaliField implements SmaliBlock{
     @Override
     public HashMap<String, String> parentNameChanges() {
         HashMap<String, String> changes = new HashMap<>();
-        for(SmaliFile parentFile: this.getParentFile().getParentFileMap().values()) {
+        for (SmaliFile parentFile : this.getParentFile().getParentFileMap().values()) {
             changes.putAll(parentFile.getFieldNameChange());
         }
         return changes;
@@ -70,6 +70,10 @@ public class SmaliField implements SmaliBlock{
     // return the new identifier
     @Override
     public void rename() {
+        rename(getAvailableID());
+    }
+
+    public void rename(String newFieldName) {
         // 1. get new field name
         String[] parts = this.getSmaliLine().getParts();
         StringBuilder builder = new StringBuilder(this.getSmaliLine().getWhitespace());
@@ -80,7 +84,6 @@ public class SmaliField implements SmaliBlock{
         }
 
         String oldFieldName = this.getIdentifier();
-        String newFieldName = getAvailableID();
 
         builder.append(newFieldName).append(":").append(this.getFieldType());
 

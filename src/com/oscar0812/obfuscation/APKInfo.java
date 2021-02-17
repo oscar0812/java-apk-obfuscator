@@ -26,6 +26,8 @@ public class APKInfo {
     private final ArrayList<File> manifestAppFileList = new ArrayList<>();
     private final HashMap<String, File> manifestAppFileMap = new HashMap<>();
 
+    private final HashMap<String, String> pathToPackage = new HashMap<>();
+
     private static APKInfo instance = null;
 
     public static APKInfo getInstance() {
@@ -58,6 +60,8 @@ public class APKInfo {
 
                 // TODO: what about apks with smali/ AND smali_classes2/
                 smaliDir = new File(apkDecompileDir, "smali");
+                pathToPackage.put(smaliDir.getAbsolutePath(), ""); // base package
+
                 resDir = new File(apkDecompileDir, "res");
             }
         }
@@ -96,8 +100,8 @@ public class APKInfo {
     public void fetchDecompiledInfo() {
         manifestFileInfo();
         ResourceInfo.getInstance(); // start a resource info instance
-        fetchSmaliFiles();
         fetchRSmaliFiles();
+        fetchSmaliFiles();
     }
 
     // get android info from android manifest
@@ -138,6 +142,41 @@ public class APKInfo {
         }
     }
 
+    // get R.smali files in ALL directories under smali/
+    private void fetchRSmaliFiles() {
+        Queue<File> q = new LinkedList<>();
+        q.add(smaliDir);
+
+        while (!q.isEmpty()) {
+            File parent = q.poll(); // retrieve and remove the first element
+            File[] files = parent.listFiles();
+
+            if (files == null) {
+                continue;
+            }
+
+            for (File childFile : files) {
+                if (childFile.isFile()) {
+                    String name = childFile.getName();
+                    if (name.equals("R.smali") || (name.startsWith("R$") && name.endsWith(".smali"))) {
+                        // append this smali childFile
+                        File r = new File(parent, "R.smali");
+                        File rID = new File(parent, "R$id.smali");
+
+                        if (r.exists() && rID.exists()) {
+                            // this is an R file
+                            SmaliFile sf = new SmaliFile(childFile.getAbsolutePath());
+                            RFileMap.put(sf.getAbsolutePath(), sf);
+                        }
+                    }
+                } else if (childFile.isDirectory()) {
+                    // found directory
+                    q.add(childFile);
+                }
+            }
+        }
+    }
+
     private void fetchSmaliFiles() {
         // ok got the main files, now search for R.smali, that should tell us what the root directory of the apk is
         Queue<File> q = new LinkedList<>(manifestAppFileList);
@@ -152,15 +191,11 @@ public class APKInfo {
                 // System.out.println("CHECKING: "+f.getAbsolutePath());
                 File r = new File(parent, "R.smali");
 
-                if (r.exists()) {
-                    File rID = new File(parent, "R$id.smali");
-                    // every R.smali comes with a R$id.smali by design
-                    if (rID.exists()) {
-                        mainRSmaliFile = new SmaliFile(parent, "R.smali");
-                        break;
-                    }
+                if (r.exists() && RFileMap.containsKey(r.getAbsolutePath())) {
+                    mainRSmaliFile = RFileMap.get(r.getAbsolutePath());
+                    break;
                 } else if (!parent.getAbsolutePath().equals(smaliDir.getAbsolutePath())) {
-                    // can still go back
+                    // we can still go back
                     q.add(parent.getParentFile());
                 }
 
@@ -175,11 +210,6 @@ public class APKInfo {
         q.clear();
         q.add(mainRSmaliFile.getParentFile());
 
-        // to set the smali packages
-        HashMap<String, String> pathToPackage = new HashMap<>();
-        Stack<File> packageStack = new Stack<>();
-        pathToPackage.put(smaliDir.getAbsolutePath(), ""); // base package
-
         while (!q.isEmpty()) {
             File parent = q.poll(); // retrieve and remove the first element
             File[] files = parent.listFiles();
@@ -193,27 +223,6 @@ public class APKInfo {
                     if (file.getName().endsWith(".smali")) {
                         // append this smali file
                         SmaliFile sf = new SmaliFile(file.getAbsolutePath());
-
-                        // get package. Bubble up to known parent
-                        File bubbler = file.getParentFile();
-                        while (!pathToPackage.containsKey(bubbler.getAbsolutePath())) {
-                            packageStack.add(bubbler);
-                            bubbler = bubbler.getParentFile();
-                        }
-
-                        // Bubble down to current file and set the trail of paths
-                        StringBuilder builder = new StringBuilder(pathToPackage.get(bubbler.getAbsolutePath()));
-                        while (!packageStack.empty()) {
-                            bubbler = packageStack.pop();
-                            builder.append(bubbler.getName()).append("/");
-                            pathToPackage.put(bubbler.getAbsolutePath(), builder.toString());
-                        }
-
-                        int index = file.getName().lastIndexOf(".smali");
-                        String withoutExt = file.getName().substring(0, index);
-
-                        // set package
-                        sf.setSmaliPackage("L" + builder.toString() + withoutExt + ";");
                         addSmaliFile(sf);
                     }
                 } else if (file.isDirectory()) {
@@ -224,28 +233,15 @@ public class APKInfo {
         }
     }
 
-    private void fetchRSmaliFiles() {
-        // get R.smali subclasses
-        mainRSmaliFile.processLines();
-
-        RFileMap.put(mainRSmaliFile.getAbsolutePath(), mainRSmaliFile);
-        for(SmaliLine annotation: mainRSmaliFile.getFirstWordSmaliLineMap().get(".annotation")) {
-            SmaliLine runner = annotation.getNextSmaliLine();
-            while(!runner.getParts()[0].equals(".end")) {
-                for(SmaliFile smaliFile: runner.getReferenceSmaliFileList()) {
-                    RFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
-                }
-
-                runner = runner.getNextSmaliLine();
-            }
-        }
-    }
-
     public String getName() {
         return apkName;
     }
 
     public HashMap<String, SmaliFile> getRFileMap() {
         return RFileMap;
+    }
+
+    public HashMap<String, String> getPathToPackage() {
+        return pathToPackage;
     }
 }

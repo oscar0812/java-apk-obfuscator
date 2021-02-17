@@ -1,11 +1,14 @@
 package com.oscar0812.obfuscation.smali;
 
+import com.oscar0812.obfuscation.APKInfo;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
+import java.util.Stack;
 
 public class SmaliFile extends File {
     // chain the lines
@@ -47,14 +50,44 @@ public class SmaliFile extends File {
 
     public SmaliFile(String pathname) {
         super(pathname);
+
+        setPackageFromPath();
     }
 
     public SmaliFile(File parent, String child) {
         super(parent, child);
+
+        setPackageFromPath();
     }
 
     public ArrayList<SmaliLine> getReferencedInSmaliLines() {
         return referencedInlines;
+    }
+
+    private void setPackageFromPath() {
+        // get package. Bubble up to known parent
+        Stack<File> packageStack = new Stack<>();
+        HashMap<String, String> pathToPackage = APKInfo.getInstance().getPathToPackage();
+
+        File bubbler = this.getParentFile();
+        while (!pathToPackage.containsKey(bubbler.getAbsolutePath())) {
+            packageStack.add(bubbler);
+            bubbler = bubbler.getParentFile();
+        }
+
+        // Bubble down to current file and set the trail of paths
+        StringBuilder builder = new StringBuilder(pathToPackage.get(bubbler.getAbsolutePath()));
+        while (!packageStack.empty()) {
+            bubbler = packageStack.pop();
+            builder.append(bubbler.getName()).append("/");
+            pathToPackage.put(bubbler.getAbsolutePath(), builder.toString());
+        }
+
+        int index = this.getName().lastIndexOf(".smali");
+        String withoutExt = this.getName().substring(0, index);
+
+        // set package
+        this.setSmaliPackage("L" + builder.toString() + withoutExt + ";");
     }
 
     public void addReferenceSmaliLine(SmaliLine inLine) {

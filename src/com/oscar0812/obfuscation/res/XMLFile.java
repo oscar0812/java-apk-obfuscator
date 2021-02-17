@@ -54,8 +54,5 @@ public class XMLFile extends File {
 
             q.addAll(qElement.elements());
         }
-
-        HashMap<String, ArrayList<Element>> a=attributeToElementsMap;
-        int aa = 1;
     }
 }

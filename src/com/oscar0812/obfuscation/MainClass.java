@@ -2,6 +2,7 @@ package com.oscar0812.obfuscation;
 
 import brut.common.BrutException;
 import com.oscar0812.obfuscation.smali.*;
+import com.oscar0812.obfuscation.utils.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -187,6 +188,10 @@ public class MainClass {
             sf.processLines();
         }
 
+        for(SmaliFile rSmaliFile: APKInfo.getInstance().getRFileMap().values()) {
+            rSmaliFile.processLines();
+        }
+
         ArrayList<SmaliFile> smaliFiles = new ArrayList<>(APKInfo.getInstance().getSmaliFileMap().values()); // since it changes
 
         // sort, put parent files first
@@ -214,18 +219,22 @@ public class MainClass {
         }
 
         // obfuscate R files and XML
-        StringBuilder currentName = new StringBuilder();
+        ArrayList<String> permutations = StringUtils.getStringPermutations();
+        int index = 0;
 
-        ArrayList<SmaliField> RFieldList = new ArrayList<>();
-        HashMap<String, ArrayList<SmaliField>> RFieldMap = new HashMap<>();
+        HashMap<String, String> nameChanges = new HashMap<>();
 
         for(SmaliFile smaliFile: APKInfo.getInstance().getRFileMap().values()) {
-            for(SmaliField smaliField : smaliFile.getFieldList()) {
-                RFieldList.add(smaliField);
-                if(!RFieldMap.containsKey(smaliField.getIdentifier())) {
-                    RFieldMap.put(smaliField.getIdentifier(), new ArrayList<>());
+            for(SmaliField smaliField : new ArrayList<>(smaliFile.getFieldList())) {
+                String newName;
+                if(nameChanges.containsKey(smaliField.getIdentifier())) {
+                    newName = nameChanges.get(smaliField.getIdentifier());
                 }
-                RFieldMap.get(smaliField.getIdentifier()).add(smaliField);
+                else {
+                    newName = permutations.get(index++);
+                }
+                nameChanges.put(smaliField.getIdentifier(), newName);
+                smaliField.rename(newName);
             }
         }
 
