@@ -2,7 +2,6 @@ package com.oscar0812.obfuscation;
 
 import com.oscar0812.obfuscation.res.ResourceInfo;
 import com.oscar0812.obfuscation.smali.SmaliFile;
-import com.oscar0812.obfuscation.smali.SmaliLine;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
@@ -11,6 +10,10 @@ import org.dom4j.io.SAXReader;
 import java.io.File;
 import java.util.*;
 
+
+/**
+ * Single DEX android applications have a method number limit of 65,536
+ */
 public class APKInfo {
     private static String apkName;
     private final File projectApkDir;
@@ -18,10 +21,11 @@ public class APKInfo {
     private File apkDecompileDir;
     private File smaliDir, resDir;
 
-    private SmaliFile mainRSmaliFile;
+    private File mainProjectDir;
     private final HashMap<String, SmaliFile> RFileMap = new HashMap<>();
 
-    private final HashMap<String, SmaliFile> smaliFileMap = new HashMap<>();
+    private final HashMap<String, SmaliFile> allSmaliFileMap = new HashMap<>();
+    private final HashMap<String, SmaliFile> projectSmaliFiles = new HashMap<>();
 
     private final ArrayList<File> manifestAppFileList = new ArrayList<>();
     private final HashMap<String, File> manifestAppFileMap = new HashMap<>();
@@ -87,21 +91,25 @@ public class APKInfo {
         return resDir;
     }
 
-    public HashMap<String, SmaliFile> getSmaliFileMap() {
-        return smaliFileMap;
+    public HashMap<String, SmaliFile> getAllSmaliFileMap() {
+        return allSmaliFileMap;
+    }
+
+    public HashMap<String, SmaliFile> getProjectSmaliFiles() {
+        return projectSmaliFiles;
     }
 
     public void addSmaliFile(SmaliFile smaliFile) {
         // quick access through path
-        assert !this.smaliFileMap.containsKey(smaliFile.getAbsolutePath());
-        this.smaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
+        assert !this.allSmaliFileMap.containsKey(smaliFile.getAbsolutePath());
+        this.allSmaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
     }
 
     public void fetchDecompiledInfo() {
         manifestFileInfo();
         ResourceInfo.getInstance(); // start a resource info instance
         fetchRSmaliFiles();
-        fetchSmaliFiles();
+        fetchProjectSmaliFiles();
     }
 
     // get android info from android manifest
@@ -158,16 +166,21 @@ public class APKInfo {
             for (File childFile : files) {
                 if (childFile.isFile()) {
                     String name = childFile.getName();
-                    if (name.equals("R.smali") || (name.startsWith("R$") && name.endsWith(".smali"))) {
-                        // append this smali childFile
-                        File r = new File(parent, "R.smali");
-                        File rID = new File(parent, "R$id.smali");
+                    if(name.endsWith(".smali")) {
+                        SmaliFile smaliFile = new SmaliFile(childFile.getAbsolutePath());
+                        allSmaliFileMap.put(childFile.getAbsolutePath(), smaliFile);
 
-                        if (r.exists() && rID.exists()) {
-                            // this is an R file
-                            SmaliFile sf = new SmaliFile(childFile.getAbsolutePath());
-                            RFileMap.put(sf.getAbsolutePath(), sf);
+                        if (name.equals("R.smali") || name.startsWith("R$")) {
+                            // append this smali childFile
+                            File r = new File(parent, "R.smali");
+                            File rID = new File(parent, "R$id.smali");
+
+                            if (r.exists() && rID.exists()) {
+                                // this is an R file
+                                RFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
+                            }
                         }
+
                     }
                 } else if (childFile.isDirectory()) {
                     // found directory
@@ -177,38 +190,36 @@ public class APKInfo {
         }
     }
 
-    private void fetchSmaliFiles() {
+    private File fetchProjectMainDir() {
         // ok got the main files, now search for R.smali, that should tell us what the root directory of the apk is
-        Queue<File> q = new LinkedList<>(manifestAppFileList);
-        Set<String> visitedFiles = new HashSet<>();
-
-        while (!q.isEmpty()) {
-            File f = q.poll();
-            File parent = f.getParentFile();
-
-            // only visit a folder once. Don't waste time
-            if (!visitedFiles.contains(parent.getAbsolutePath())) {
-                // System.out.println("CHECKING: "+f.getAbsolutePath());
-                File r = new File(parent, "R.smali");
-
-                if (r.exists() && RFileMap.containsKey(r.getAbsolutePath())) {
-                    mainRSmaliFile = RFileMap.get(r.getAbsolutePath());
-                    break;
-                } else if (!parent.getAbsolutePath().equals(smaliDir.getAbsolutePath())) {
-                    // we can still go back
-                    q.add(parent.getParentFile());
-                }
-
-                visitedFiles.add(parent.getAbsolutePath());
+        HashMap<String, ArrayList<SmaliFile>> dirToRFiles = new HashMap<>();
+        for(SmaliFile rSmaliFile: this.getRFileMap().values()) {
+            if(!dirToRFiles.containsKey(rSmaliFile.getParentFile().getAbsolutePath())) {
+                dirToRFiles.put(rSmaliFile.getParentFile().getAbsolutePath(), new ArrayList<>());
             }
+            dirToRFiles.get(rSmaliFile.getParentFile().getAbsolutePath()).add(rSmaliFile);
         }
 
-        assert mainRSmaliFile != null;
+        for(File manifestFile: manifestAppFileList) {
+            File bubbler = manifestFile;
+            while (!bubbler.getAbsolutePath().equals(smaliDir.getAbsolutePath())) {
+                if(dirToRFiles.containsKey(bubbler.getAbsolutePath())) {
+                    return bubbler;
+                }
+                bubbler = bubbler.getParentFile();
+            }
+        }
+        return null;
+    }
+
+    private void fetchProjectSmaliFiles() {
+        mainProjectDir = fetchProjectMainDir();
+        assert mainProjectDir != null;
 
         // got R.smali, now get all files in smali/main_package directory
         // meh recursion, use queue
-        q.clear();
-        q.add(mainRSmaliFile.getParentFile());
+        Queue<File> q = new LinkedList<>();
+        q.add(mainProjectDir);
 
         while (!q.isEmpty()) {
             File parent = q.poll(); // retrieve and remove the first element
@@ -220,10 +231,8 @@ public class APKInfo {
 
             for (File file : files) {
                 if (file.isFile()) {
-                    if (file.getName().endsWith(".smali")) {
-                        // append this smali file
-                        SmaliFile sf = new SmaliFile(file.getAbsolutePath());
-                        addSmaliFile(sf);
+                    if (allSmaliFileMap.containsKey(file.getAbsolutePath())) {
+                        projectSmaliFiles.put(file.getAbsolutePath(), allSmaliFileMap.get(file.getAbsolutePath()));
                     }
                 } else if (file.isDirectory()) {
                     // found directory

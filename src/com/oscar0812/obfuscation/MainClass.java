@@ -1,12 +1,16 @@
 package com.oscar0812.obfuscation;
 
 import brut.common.BrutException;
+import com.oscar0812.obfuscation.res.ResourceInfo;
+import com.oscar0812.obfuscation.res.XMLFile;
 import com.oscar0812.obfuscation.smali.*;
-import com.oscar0812.obfuscation.utils.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /*
  * STEPS:
@@ -180,19 +184,14 @@ public class MainClass {
         }
     }
 
+
+    // TODO: atm res/@id is hardcoded (i need to rename other fields, such as @anim)
     // start the obfuscation process
     public void obfuscate() {
-
-        // TODO: read the files in parallel to finish faster (might be alot of files)
-        for (SmaliFile sf : APKInfo.getInstance().getSmaliFileMap().values()) {
-            sf.processLines();
-        }
-
-        for(SmaliFile rSmaliFile: APKInfo.getInstance().getRFileMap().values()) {
-            rSmaliFile.processLines();
-        }
-
-        ArrayList<SmaliFile> smaliFiles = new ArrayList<>(APKInfo.getInstance().getSmaliFileMap().values()); // since it changes
+        // APKInfo info = APKInfo.getInstance();
+        // parallel process lines (7 seconds vs 31 seconds!)
+        APKInfo.getInstance().getAllSmaliFileMap().values().parallelStream().forEach(SmaliFile::processLines);
+        ArrayList<SmaliFile> smaliFiles = new ArrayList<>(APKInfo.getInstance().getProjectSmaliFiles().values()); // since it changes
 
         // sort, put parent files first
         smaliFiles.sort((a, b) -> Integer.compare(b.getChildFileMap().size(), a.getChildFileMap().size()));
@@ -202,7 +201,7 @@ public class MainClass {
         // all lines are processed, time to obfuscate
         for (SmaliFile smaliFile : smaliFiles) {
 
-            if(APKInfo.getInstance().getRFileMap().containsKey(smaliFile.getAbsolutePath())) {
+            if (APKInfo.getInstance().getRFileMap().containsKey(smaliFile.getAbsolutePath())) {
                 // don't obfuscate R files, we need them intact for xml obfuscation
                 continue;
             }
@@ -219,30 +218,51 @@ public class MainClass {
         }
 
         // obfuscate R files and XML
-        ArrayList<String> permutations = StringUtils.getStringPermutations();
-        int index = 0;
+        // I will first rename all the fields in all R.smali files, and keep a history, then
+        // I will look through all xml files and see if the they have any fields I changed
+        HashMap<String, String> publicXMLNameMap = ResourceInfo.getInstance().getXMLNameAttrChangeMap();
 
-        HashMap<String, String> nameChanges = new HashMap<>();
+        for (SmaliFile smaliFile : APKInfo.getInstance().getRFileMap().values()) {
+            if(!smaliFile.getName().equals("R$id.smali")) {
+                continue;
+            }
 
-        for(SmaliFile smaliFile: APKInfo.getInstance().getRFileMap().values()) {
-            for(SmaliField smaliField : new ArrayList<>(smaliFile.getFieldList())) {
-                String newName;
-                if(nameChanges.containsKey(smaliField.getIdentifier())) {
-                    newName = nameChanges.get(smaliField.getIdentifier());
+            for (SmaliField smaliField : new ArrayList<>(smaliFile.getFieldList())) {
+                // smali: TextAppearance_Compat_Notification
+                // XML:   TextAppearance.Compat.Notification
+                String smaliToXMLName = smaliField.getIdentifier().replaceAll("[_]+", ".");
+                String identifier = null;
+                if (publicXMLNameMap.containsKey(smaliField.getIdentifier())) {
+                    identifier = smaliField.getIdentifier();
+
+                } else if (publicXMLNameMap.containsKey(smaliToXMLName)) {
+                    identifier = smaliToXMLName;
                 }
-                else {
-                    newName = permutations.get(index++);
+                if (identifier != null) {
+                    smaliField.rename(publicXMLNameMap.get(identifier).replaceAll("[.]+", "_"));
                 }
-                nameChanges.put(smaliField.getIdentifier(), newName);
-                smaliField.rename(newName);
             }
         }
 
+        for (XMLFile xmlFile : ResourceInfo.getInstance().getAllXMLFiles().values()) {
+            xmlFile.processLines();
+        }
+
         // save
-        for (SmaliFile smaliFile : APKInfo.getInstance().getSmaliFileMap().values()) {
+        for (SmaliFile smaliFile : APKInfo.getInstance().getAllSmaliFileMap().values()) {
             smaliFile.saveToDisk();
         }
 
+        // rename drawable files
+        for (String from : ResourceInfo.getInstance().getRenameFilesMap().keySet()) {
+            File fromFile = new File(from);
+            File toFile = new File(ResourceInfo.getInstance().getRenameFilesMap().get(from));
+            if (!fromFile.renameTo(toFile)) {
+                System.out.println("COULDN'T RENAME: " + fromFile.getAbsolutePath() + " -> " + toFile.getAbsolutePath());
+            } else {
+                System.out.println("RENAMED: " + fromFile.getAbsolutePath() + " -> " + toFile.getAbsolutePath());
+            }
+        }
     }
 
 

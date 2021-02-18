@@ -82,8 +82,8 @@ public class SmaliLine {
 
     // check if this line connects/refers to other lines, and if its a special line (method, field, etc)
     private void process() {
-        // check if lines reference any class within the main package
-        HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getSmaliFileMap();
+        // check if lines reference any class
+        HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getAllSmaliFileMap();
 
         File smaliDir = APKInfo.getInstance().getSmaliDir();
 

@@ -36,7 +36,7 @@ public class StringUtils {
 
     public static ArrayList<String> getStringPermutations() {
         if(stringPermutations.size() == 0) {
-            for (int x = 1; x<=5; x++) {
+            for (int x = 1; x<=4; x++) {
                 getAllStringsOfKLength("", x, stringPermutations);
             }
         }
