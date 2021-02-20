@@ -33,12 +33,6 @@ public interface SmaliBlock {
         Set<String> takenIDs = getTakenIDs();
         ArrayList<String> permutations = StringUtils.getStringPermutations();
 
-        // parent might have already renamed
-        HashMap<String, String> nameChanges = parentNameChanges();
-        if(nameChanges.containsKey(getIdentifier())) {
-            return nameChanges.get(getIdentifier());
-        }
-
         for (String perm : permutations) {
             if (!takenIDs.contains(perm + appendAfterName())) {
                 // new!

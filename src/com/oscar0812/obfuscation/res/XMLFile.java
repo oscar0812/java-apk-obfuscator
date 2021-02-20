@@ -73,6 +73,7 @@ public class XMLFile extends File {
         try {
             xmlWriter = new XMLWriter(new FileOutputStream(file), OutputFormat.createPrettyPrint());
             xmlWriter.write(document);
+            xmlWriter.close(); // close the file or we CANT RENAME
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -84,9 +85,12 @@ public class XMLFile extends File {
         }
 
         // if (text.startsWith("@") && !text.startsWith("@android:")) {
-        if(text.startsWith("@id/")) {
+        if(text.startsWith("@") && !text.contains("android:")) {
             // @id/something
-            return text.indexOf("/") + 1;
+            if(!text.startsWith("@attr/")) {
+                // ignoring styles and attributes for now
+                return text.indexOf("/") + 1;
+            }
         } else if (text.startsWith("?") && !text.startsWith("?android:")) {
             // ?something
             // return 1;

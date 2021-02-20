@@ -29,25 +29,28 @@ public class ResourceInfo {
     private final HashMap<String, XMLFile> allXMLFiles = new HashMap<>();
 
     // Map: renameThis->toThis
-    private final Set<String> renameTheseFiles = new HashSet<>();
     private final HashMap<String, String> renameFilesMap = new HashMap<>();
+    private final Set<String> takenRenames = new HashSet<>(); // what file names we already used in renaming
 
     ArrayList<String> permutations = StringUtils.getStringPermutations();
     int permIndex = 0;
 
-    Set<String> ignoredAttributes = new HashSet<>(Arrays.asList("buttonGravity", "nanananananan"));
-
-    Map<String, String> typeToFileName = Map.ofEntries(
-            new AbstractMap.SimpleEntry<>("id", "ids")
-    );
+    final String PRE = "r" + permutations.get((new Random()).nextInt(26));
 
     private ResourceInfo() {
         fetchFiles();
-        parseValuesDir();
-        int aa = 1;
     }
 
-    private void parseValuesDir() {
+    private void workOnType(HashMap<String, ArrayList<File>> nameNoExtensionToFileCopy) {
+        for (String key : valueXMLFiles.keySet()) {
+            for (File valueXMLFile : valueXMLFiles.get(key)) {
+                Document document = parseValueXML(valueXMLFile, nameNoExtensionToFileCopy);
+                XMLFile.saveXMLFile(valueXMLFile, document);
+            }
+        }
+    }
+
+    public void parseValuesDir() {
         // we need a copy, don't want to mess around with og hashmap
         HashMap<String, ArrayList<File>> nameNoExtensionToFileCopy = new HashMap<>(nameNoExtensionToFile);
 
@@ -55,18 +58,13 @@ public class ResourceInfo {
         XMLFile publicXMLFile = new XMLFile(APKInfo.getInstance().getResDir(), "values" + File.separator + "public.xml");
         valueXMLFiles.remove("public");
 
+        // ignore styles and attributes
+        valueXMLFiles.remove("attrs");
+
         Document document = parseValueXML(publicXMLFile, nameNoExtensionToFileCopy);
         XMLFile.saveXMLFile(publicXMLFile, document);
 
-        for (File valueXMLFile : valueXMLFiles.get(typeToFileName.get("id"))) {
-            document = parseValueXML(valueXMLFile, nameNoExtensionToFileCopy);
-            XMLFile.saveXMLFile(valueXMLFile, document);
-        }
-
-        // now add files to rename map
-        for (String fileName : renameTheseFiles) {
-            addToRenameMap(fileName, nameNoExtensionToFileCopy);
-        }
+        workOnType(nameNoExtensionToFileCopy);
     }
 
     private Document parseValueXML(File valueXMLFile, HashMap<String, ArrayList<File>> nameNoExtensionToFileCopy) {
@@ -78,28 +76,35 @@ public class ResourceInfo {
 
         while (!q.isEmpty()) {
             Element qElement = q.poll();
+            if (qElement.getParent() != null && qElement.getParent().getName().equals("style")) {
+                // children of style tags are attributes, which we ignore
+                continue;
+            }
+
             String name = qElement.attributeValue("name");
             String type = qElement.attributeValue("type");
 
             if (name != null && !name.isEmpty() && !name.startsWith("android:")) {
+                String newName = null;
                 if (nameNoExtensionToFileCopy.containsKey(name)) {
                     // We are going to rename files, make sure that the new file name is not taken, otherwise we will override files
-                    // renameTheseFiles.add(name);
-                    continue;
+                    newName = addToRenameMap(name, nameNoExtensionToFileCopy);
                 }
-                // LETS WORRY ABOUT ID first
-                if (type != null && type.equals("id")) {
+                // bug with attributes
+                if (type != null && (!type.equals("attr"))) {
                     if (!XMLNameAttrChangeMap.containsKey(name)) {
-                        String newName = "r" + permutations.get(permIndex++);
+                        if (newName == null) {
+                            newName = PRE + permutations.get(permIndex++);
+                        }
                         if (name.contains(".")) {
                             newName = name.substring(0, name.lastIndexOf(".") + 1) + newName;
                         }
                         XMLNameAttrChangeMap.put(name, newName);
                     }
+                }
 
-                    if (XMLNameAttrChangeMap.containsKey(name)) {
-                        qElement.addAttribute("name", XMLNameAttrChangeMap.get(name));
-                    }
+                if (XMLNameAttrChangeMap.containsKey(name)) {
+                    qElement.addAttribute("name", XMLNameAttrChangeMap.get(name));
                 }
             }
             q.addAll(qElement.elements());
@@ -108,34 +113,36 @@ public class ResourceInfo {
         return doc;
     }
 
-    private void addToRenameMap(String name, HashMap<String, ArrayList<File>> nameNoExtensionToFileCopy) {
+    private String addToRenameMap(String name, HashMap<String, ArrayList<File>> nameNoExtensionToFileCopy) {
         HashMap<String, File> allChildrenFiles = new HashMap<>();
         for (File renameChild : nameNoExtensionToFileCopy.get(name)) {
             File[] siblingList = renameChild.getParentFile().listFiles();
             if (siblingList != null) {
                 for (File sibling : siblingList) {
-                    String pathNoExt = sibling.getAbsolutePath();
-                    pathNoExt = pathNoExt.substring(0, pathNoExt.lastIndexOf("."));
-                    allChildrenFiles.put(pathNoExt, sibling);
+                    String nameNoExt = sibling.getName();
+                    nameNoExt = nameNoExt.substring(0, nameNoExt.indexOf("."));
+                    allChildrenFiles.put(nameNoExt, sibling);
                 }
             }
         }
+        String newName;
+        do {
+            newName = PRE + permutations.get(permIndex++);
+            // loop until its a new file
+        } while (allChildrenFiles.containsKey(newName) || takenRenames.contains(newName));
 
-        String newName = permutations.get(++permIndex);
-        // loop until its a new file
-        while (allChildrenFiles.containsKey(newName)) {
-            newName = "r_" + permutations.get(permIndex++);
-        }
+        takenRenames.add(newName);
+
         for (File renameThis : nameNoExtensionToFileCopy.get(name)) {
             String ext = renameThis.getName();
-            int lastIndex = ext.lastIndexOf(".");
-            ext = ext.substring(lastIndex);
+            ext = ext.substring(ext.indexOf("."));
 
             File renameToThis = new File(renameThis.getParentFile(), newName + ext);
             renameFilesMap.put(renameThis.getAbsolutePath(), renameToThis.getAbsolutePath());
         }
 
         nameNoExtensionToFileCopy.remove(name);
+        return newName;
     }
 
     public static Document readXMLFile(File XMLFile) {

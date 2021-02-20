@@ -32,7 +32,7 @@ public class SmaliLine {
     private String whitespace; // how much whitespace is at the beg of text
 
     private String[] parts;
-    private Set<String> partsSet = new HashSet<>();
+    private final Set<String> partsSet = new HashSet<>();
 
     private final SmaliFile parentFile;
     private SmaliMethod parentMethod = null; // is this line in a method?

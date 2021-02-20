@@ -77,15 +77,15 @@ public class SmaliMethod implements SmaliBlock {
 
     @Override
     public void rename() {
-        if(this.isAbstract()) {
-            int aa = 1;
-        }
-
         String oldMethodID = this.getIdentifier();
         String newMethodID;
         HashMap<String, String> nameChanges = parentNameChanges();
         if (nameChanges.containsKey(this.getIdentifier())) {
+            // parent already renamed this
             newMethodID = nameChanges.get(this.getIdentifier());
+        }else if(isAbstract() && getParentFile().isAbstract()) {
+            // special case: abstract classes
+            newMethodID = getAvailableID();
         } else if (!this.canRename()) {
             // don't rename these
             return;
@@ -121,6 +121,16 @@ public class SmaliMethod implements SmaliBlock {
     // re-link all the lines pointing to this method
     private void relinkAfterRename(String oldMethodID, String newMethodID) {
         HashMap<String, ArrayList<SmaliLine>> references = this.getParentFile().getMethodReferences();
+        for (SmaliFile childFile : this.getParentFile().getChildFileMap().values()) {
+            if(!childFile.getMethodMap().containsKey(oldMethodID) && childFile.getMethodReferences().containsKey(oldMethodID)) {
+                // child has references to this method, but doesn't contain the method!
+                if(!references.containsKey(oldMethodID)) {
+                    references.put(oldMethodID, new ArrayList<>());
+                }
+                references.get(oldMethodID).addAll(childFile.getMethodReferences().get(oldMethodID));
+            }
+        }
+
         if (references.containsKey(oldMethodID)) {
             for (SmaliLine smaliLine : new ArrayList<>(references.get(oldMethodID))) {
                 String replaceThis = "->" + oldMethodID + methodReturnType;
@@ -190,7 +200,7 @@ public class SmaliMethod implements SmaliBlock {
     public boolean canRename() {
         // TODO: make renaming virtual methods possible:
         // renaming parent - child functions messes up stuff, but how do I check all parents???
-        return (!isConstructor() && !isSynthetic() && !isVirtual()) || (isAbstract() && getParentFile().isAbstract());
+        return (!isConstructor() && !isSynthetic() && !isVirtual());
     }
 
     public String getMethodName() {

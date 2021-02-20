@@ -8,9 +8,6 @@ import com.oscar0812.obfuscation.smali.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /*
  * STEPS:
@@ -141,7 +138,8 @@ public class MainClass {
         // DOESN'T WORK: line 16 of SongLoader: "is_music=1 AND title != \'\'"
         for (SmaliLine smaliLine : smaliLines) {
             String[] parts = smaliLine.getParts();
-            if (parts.length > 2 && parts[parts.length - 1].contains("\\'\\'") && parts[1].equals("v0,")) {
+            // if (parts.length > 2 && parts[parts.length - 1].contains("\\'\\'") && parts[1].equals("v0,")) {
+            if(parts.length > 2 && parts[parts.length-1].contains("\\")) {
                 // weird case with const-string if it contains \'\' and stored at v0
                 continue;
             }
@@ -184,6 +182,57 @@ public class MainClass {
         }
     }
 
+    private void obfuscateRSmaliAndXML() {
+        ResourceInfo.getInstance().parseValuesDir();
+        // obfuscate R files and XML
+        // I will first rename all the fields in res/values folders, and keep a history, then
+        // I will look through all R.smali files and see if the they have any fields I changed
+        HashMap<String, String> publicXMLNameMap = ResourceInfo.getInstance().getXMLNameAttrChangeMap();
+
+        for (SmaliFile smaliFile : APKInfo.getInstance().getRFileMap().values()) {
+            // TODO: un-hardcode this
+            String fn = smaliFile.getName();
+            if(fn.equals("R$attr.smali")) {
+                continue;
+            }
+
+            for (SmaliField smaliField : new ArrayList<>(smaliFile.getFieldList())) {
+                // smali: TextAppearance_Compat_Notification
+                // XML:   TextAppearance.Compat.Notification
+                String smaliToXMLName = smaliField.getIdentifier().replaceAll("[_]+", ".");
+                String identifier = null;
+                if (publicXMLNameMap.containsKey(smaliField.getIdentifier())) {
+                    identifier = smaliField.getIdentifier();
+
+                } else if (publicXMLNameMap.containsKey(smaliToXMLName)) {
+                    identifier = smaliToXMLName;
+                }
+                if (identifier != null) {
+                    smaliField.rename(publicXMLNameMap.get(identifier).replaceAll("[.]+", "_"));
+                }
+            }
+        }
+
+        // AndroidManifest uses values??? news to me
+        XMLFile androidManifest = new XMLFile(APKInfo.getInstance().getApkDecompileDir(), "AndroidManifest.xml");
+        ResourceInfo.getInstance().getAllXMLFiles().put(androidManifest.getAbsolutePath(), androidManifest);
+        for (XMLFile xmlFile : ResourceInfo.getInstance().getAllXMLFiles().values()) {
+            xmlFile.processLines();
+        }
+    }
+
+    private void renameDrawables() {
+        // rename drawable files
+        for (String from : ResourceInfo.getInstance().getRenameFilesMap().keySet()) {
+            File fromFile = new File(from);
+            File toFile = new File(ResourceInfo.getInstance().getRenameFilesMap().get(from));
+            while (!fromFile.renameTo(toFile)) {
+                System.out.println("COULDN'T RENAME: " + fromFile.getAbsolutePath() + " -> " + toFile.getAbsolutePath());
+            }
+            System.out.println("RENAMED: " + fromFile.getAbsolutePath() + " -> " + toFile.getAbsolutePath());
+        }
+    }
+
 
     // TODO: atm res/@id is hardcoded (i need to rename other fields, such as @anim)
     // start the obfuscation process
@@ -191,6 +240,7 @@ public class MainClass {
         // APKInfo info = APKInfo.getInstance();
         // parallel process lines (7 seconds vs 31 seconds!)
         APKInfo.getInstance().getAllSmaliFileMap().values().parallelStream().forEach(SmaliFile::processLines);
+
         ArrayList<SmaliFile> smaliFiles = new ArrayList<>(APKInfo.getInstance().getProjectSmaliFiles().values()); // since it changes
 
         // sort, put parent files first
@@ -217,51 +267,12 @@ public class MainClass {
             // other...
         }
 
-        // obfuscate R files and XML
-        // I will first rename all the fields in all R.smali files, and keep a history, then
-        // I will look through all xml files and see if the they have any fields I changed
-        HashMap<String, String> publicXMLNameMap = ResourceInfo.getInstance().getXMLNameAttrChangeMap();
-
-        for (SmaliFile smaliFile : APKInfo.getInstance().getRFileMap().values()) {
-            if(!smaliFile.getName().equals("R$id.smali")) {
-                continue;
-            }
-
-            for (SmaliField smaliField : new ArrayList<>(smaliFile.getFieldList())) {
-                // smali: TextAppearance_Compat_Notification
-                // XML:   TextAppearance.Compat.Notification
-                String smaliToXMLName = smaliField.getIdentifier().replaceAll("[_]+", ".");
-                String identifier = null;
-                if (publicXMLNameMap.containsKey(smaliField.getIdentifier())) {
-                    identifier = smaliField.getIdentifier();
-
-                } else if (publicXMLNameMap.containsKey(smaliToXMLName)) {
-                    identifier = smaliToXMLName;
-                }
-                if (identifier != null) {
-                    smaliField.rename(publicXMLNameMap.get(identifier).replaceAll("[.]+", "_"));
-                }
-            }
-        }
-
-        for (XMLFile xmlFile : ResourceInfo.getInstance().getAllXMLFiles().values()) {
-            xmlFile.processLines();
-        }
+        obfuscateRSmaliAndXML();
+        renameDrawables();
 
         // save
         for (SmaliFile smaliFile : APKInfo.getInstance().getAllSmaliFileMap().values()) {
             smaliFile.saveToDisk();
-        }
-
-        // rename drawable files
-        for (String from : ResourceInfo.getInstance().getRenameFilesMap().keySet()) {
-            File fromFile = new File(from);
-            File toFile = new File(ResourceInfo.getInstance().getRenameFilesMap().get(from));
-            if (!fromFile.renameTo(toFile)) {
-                System.out.println("COULDN'T RENAME: " + fromFile.getAbsolutePath() + " -> " + toFile.getAbsolutePath());
-            } else {
-                System.out.println("RENAMED: " + fromFile.getAbsolutePath() + " -> " + toFile.getAbsolutePath());
-            }
         }
     }
 

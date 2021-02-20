@@ -253,4 +253,5 @@ public class APKInfo {
     public HashMap<String, String> getPathToPackage() {
         return pathToPackage;
     }
+
 }
