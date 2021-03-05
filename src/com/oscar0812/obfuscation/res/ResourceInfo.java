@@ -35,7 +35,7 @@ public class ResourceInfo {
     ArrayList<String> permutations = StringUtils.getStringPermutations();
     int permIndex = 0;
 
-    final String PRE = "r" + permutations.get((new Random()).nextInt(26));
+    final String PRE = "r";
 
     private ResourceInfo() {
         fetchFiles();

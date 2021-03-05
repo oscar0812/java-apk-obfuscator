@@ -139,7 +139,7 @@ public class MainClass {
         for (SmaliLine smaliLine : smaliLines) {
             String[] parts = smaliLine.getParts();
             // if (parts.length > 2 && parts[parts.length - 1].contains("\\'\\'") && parts[1].equals("v0,")) {
-            if(parts.length > 2 && parts[parts.length-1].contains("\\")) {
+            if (parts.length > 2 && parts[parts.length - 1].contains("\\")) {
                 // weird case with const-string if it contains \'\' and stored at v0
                 continue;
             }
@@ -190,9 +190,9 @@ public class MainClass {
         HashMap<String, String> publicXMLNameMap = ResourceInfo.getInstance().getXMLNameAttrChangeMap();
 
         for (SmaliFile smaliFile : APKInfo.getInstance().getRFileMap().values()) {
-            // TODO: un-hardcode this
             String fn = smaliFile.getName();
-            if(fn.equals("R$attr.smali")) {
+            if (fn.equals("R$attr.smali")) {
+                // attributes crash stuff, idk why
                 continue;
             }
 
@@ -229,19 +229,46 @@ public class MainClass {
             while (!fromFile.renameTo(toFile)) {
                 System.out.println("COULDN'T RENAME: " + fromFile.getAbsolutePath() + " -> " + toFile.getAbsolutePath());
             }
-            System.out.println("RENAMED: " + fromFile.getAbsolutePath() + " -> " + toFile.getAbsolutePath());
+            // System.out.println("RENAMED: " + fromFile.getAbsolutePath() + " -> " + toFile.getAbsolutePath());
         }
     }
 
+    // we have to call rename() on all files first to replace class calls on all files, then we can rename the file in disk
+    private void renameSmaliClassFiles() {
+        HashMap<String, SmaliFile> rFileMap = APKInfo.getInstance().getRFileMap();
 
-    // TODO: atm res/@id is hardcoded (i need to rename other fields, such as @anim)
+        for (SmaliFile smaliFile : APKInfo.getInstance().getProjectSmaliFileMap().values()) {
+            if(rFileMap.containsKey(smaliFile.getAbsolutePath())) {
+                continue;
+            }
+            smaliFile.rename();
+        }
+
+        HashMap<String, String> renamedMap = APKInfo.getInstance().getNewToOldRenamedFilePathMap();
+        HashMap<String, SmaliFile> allSmaliMap = APKInfo.getInstance().getAllSmaliFileMap();
+        HashMap<String, SmaliFile> projectSmaliMap = APKInfo.getInstance().getProjectSmaliFileMap();
+
+        for(String newFilePath: renamedMap.keySet()) {
+            String oldFilePath = renamedMap.get(newFilePath);
+            SmaliFile smaliFile = allSmaliMap.get(oldFilePath);
+            // TODO: MIGHT need to change smaliFile package
+
+            allSmaliMap.put(newFilePath, allSmaliMap.remove(smaliFile.getAbsolutePath()));
+            projectSmaliMap.put(newFilePath, projectSmaliMap.remove(smaliFile.getAbsolutePath()));
+
+            while(smaliFile.exists() && !smaliFile.delete()) {
+                System.out.println("COULDN'T DELETE:: " + smaliFile.getAbsolutePath());
+            }
+        }
+    }
+
     // start the obfuscation process
     public void obfuscate() {
-        // APKInfo info = APKInfo.getInstance();
+        APKInfo apkInfo = APKInfo.getInstance();
         // parallel process lines (7 seconds vs 31 seconds!)
         APKInfo.getInstance().getAllSmaliFileMap().values().parallelStream().forEach(SmaliFile::processLines);
 
-        ArrayList<SmaliFile> smaliFiles = new ArrayList<>(APKInfo.getInstance().getProjectSmaliFiles().values()); // since it changes
+        ArrayList<SmaliFile> smaliFiles = new ArrayList<>(APKInfo.getInstance().getProjectSmaliFileMap().values()); // since it changes
 
         // sort, put parent files first
         smaliFiles.sort((a, b) -> Integer.compare(b.getChildFileMap().size(), a.getChildFileMap().size()));
@@ -262,20 +289,27 @@ public class MainClass {
             obfuscateMethods(smaliFile);
             obfuscateFields(smaliFile);
             // deleteDebugLines(smaliFile);
-            // TODO: Obfuscate classes (class name change)
 
             // other...
         }
 
+        // save the obf string classes to their files, since we need to start renaming
+        for(String path: APKInfo.getInstance().getCreatedSmaliFileMap().keySet()) {
+            SmaliFile smaliFile = APKInfo.getInstance().getCreatedSmaliFileMap().get(path);
+            smaliFile.saveToDisk(path);
+        }
+
+        renameSmaliClassFiles();
+
         obfuscateRSmaliAndXML();
         renameDrawables();
 
-        // save
-        for (SmaliFile smaliFile : APKInfo.getInstance().getAllSmaliFileMap().values()) {
-            smaliFile.saveToDisk();
+        // save everything
+        for(String path: APKInfo.getInstance().getAllSmaliFileMap().keySet()) {
+            SmaliFile smaliFile = APKInfo.getInstance().getAllSmaliFileMap().get(path);
+            smaliFile.saveToDisk(path);
         }
     }
-
 
     private void start() {
         APKInfo.setApkName("timber.apk");
@@ -302,9 +336,6 @@ public class MainClass {
     // TODO: what about reflective methods?
     // obfuscate xml?
     // obfuscate assets?
-
-    // TODO: timber.apk crashes after const-string obfuscation, but doesn't if some lines are left out.
-    // TODO: track down the problem by NOT obfuscating some files and check if it still works, recursively
 
     public static void main(String[] args) {
         MainClass m = new MainClass();

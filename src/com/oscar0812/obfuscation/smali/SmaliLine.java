@@ -42,7 +42,6 @@ public class SmaliLine {
     private final HashMap<String, SmaliFile> referenceSmaliFileMap = new HashMap<>();
 
     private boolean isGarbage = false;
-    private final String ID = UUID.randomUUID().toString().replace("-", "");
 
     public SmaliLine(String text, SmaliFile parentFile) {
         this.parentFile = parentFile;
@@ -247,10 +246,6 @@ public class SmaliLine {
 
     public boolean isGarbage() {
         return isGarbage;
-    }
-
-    public String getID() {
-        return ID;
     }
 
     @Override

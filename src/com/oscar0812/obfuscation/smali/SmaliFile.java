@@ -1,50 +1,48 @@
 package com.oscar0812.obfuscation.smali;
 
 import com.oscar0812.obfuscation.APKInfo;
+import com.oscar0812.obfuscation.utils.StringUtils;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Scanner;
-import java.util.Stack;
+import java.util.*;
 
 public class SmaliFile extends File {
     // chain the lines
     private SmaliLine firstSmaliLine = null;
     private SmaliLine lastSmaliLine = null;
 
-    private final HashMap<String, ArrayList<SmaliLine>> firstWordSmaliLineMap = new HashMap<>(); // first word->list[SmaliLines]: ".field"->[....], "const-string"->[...]
+    private HashMap<String, ArrayList<SmaliLine>> firstWordSmaliLineMap = new HashMap<>(); // first word->list[SmaliLines]: ".field"->[....], "const-string"->[...]
     private SmaliLine lastDescriptiveComment = null;
 
     // what lines reference/link/use this file
-    private final ArrayList<SmaliLine> referencedInlines = new ArrayList<>();
+    private ArrayList<SmaliLine> referencedInlines = new ArrayList<>();
     private String smaliPackage = "";
     private String smaliClass = "";
 
     // field lines
-    private final ArrayList<SmaliField> fieldList = new ArrayList<>();
-    private final HashMap<String, SmaliField> fieldMap = new HashMap<>();
+    private ArrayList<SmaliField> fieldList = new ArrayList<>();
+    private HashMap<String, SmaliField> fieldMap = new HashMap<>();
 
     // file lines (parent - child)
-    private final HashMap<String, SmaliFile> childFileMap = new HashMap<>();
-    private final HashMap<String, SmaliFile> parentFileMap = new HashMap<>();
+    private HashMap<String, SmaliFile> childFileMap = new HashMap<>();
+    private HashMap<String, SmaliFile> parentFileMap = new HashMap<>();
 
     // married share a child file
-    private final HashMap<String, SmaliFile> marriedFileMap = new HashMap<>();
+    private HashMap<String, SmaliFile> marriedFileMap = new HashMap<>();
 
     // method blocks
-    private final ArrayList<SmaliMethod> methodList = new ArrayList<>();
+    private ArrayList<SmaliMethod> methodList = new ArrayList<>();
 
     // getCurrentTrack() -> SmaliMethod
-    private final HashMap<String, SmaliMethod> methodMap = new HashMap<>();
+    private HashMap<String, SmaliMethod> methodMap = new HashMap<>();
 
-    private final HashMap<String, String> methodNameChange = new HashMap<>();
-    private final HashMap<String, String> fieldNameChange = new HashMap<>();
+    private HashMap<String, String> methodNameChange = new HashMap<>();
+    private HashMap<String, String> fieldNameChange = new HashMap<>();
 
-    private final HashMap<String, ArrayList<SmaliLine>> methodReferences = new HashMap<>(); // link method name to lines that reference it
-    private final HashMap<String, ArrayList<SmaliLine>> fieldReferences = new HashMap<>();  // link field name to lines that reference it
+    private HashMap<String, ArrayList<SmaliLine>> methodReferences = new HashMap<>(); // link method name to lines that reference it
+    private HashMap<String, ArrayList<SmaliLine>> fieldReferences = new HashMap<>();  // link field name to lines that reference it
 
     public long debugLine = 50;
 
@@ -194,34 +192,63 @@ public class SmaliFile extends File {
         }
     }
 
-    public void saveToDisk() {
+    public void saveToDisk(String absolutePath) {
         try {
-            if (exists() || createNewFile()) {
+            FileWriter writer = new FileWriter(absolutePath, false);
 
-                FileWriter writer = new FileWriter(getAbsolutePath(), false);
-
-                SmaliLine line = firstSmaliLine;
-                while (line != null) {
-                    if (line.getParts()[0].equals(".method") && line.getPrevSmaliLine() != null
-                            && !line.getPrevSmaliLine().isEmpty() && !line.getPrevSmaliLine().isComment()) {
-                        // we need a space before .method (bothers me)
-                        writer.write("\n");
-                    }
-
-                    writer.write(line.getText());
+            SmaliLine line = firstSmaliLine;
+            while (line != null) {
+                if (line.getParts()[0].equals(".method") && line.getPrevSmaliLine() != null
+                        && !line.getPrevSmaliLine().isEmpty() && !line.getPrevSmaliLine().isComment()) {
+                    // we need a space before .method (bothers me)
                     writer.write("\n");
-
-                    line = line.getNextSmaliLine();
                 }
 
-                writer.close();
-            } else {
-                System.out.println("COULDN'T CREATE FILE: " + getAbsolutePath());
+                writer.write(line.getText());
+                writer.write("\n");
+
+                line = line.getNextSmaliLine();
             }
+
+            writer.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
 
+    // check all files in the same directory, and rename to something that doesnt exist
+    private File getNewFile() {
+        File parent = this.getParentFile();
+        ArrayList<String> permutations = StringUtils.getStringPermutations();
+        for (String perm : permutations) {
+            File newFile = new File(parent, perm + ".smali");
+            if (!newFile.exists() && !APKInfo.getInstance().getAllSmaliFileMap().containsKey(newFile.getAbsolutePath())
+                    && !APKInfo.getInstance().getNewToOldRenamedFilePathMap().containsKey(newFile.getAbsolutePath())) {
+                return newFile;
+            }
+        }
+        return null;
+    }
+
+    public void rename() {
+        File newFile = getNewFile();
+        assert newFile != null;
+        SmaliFile renameFileTo = new SmaliFile(newFile.getAbsolutePath());
+
+        // rename references in smali
+        ArrayList<SmaliLine> referencedInLines = new ArrayList<>(this.getReferencedInSmaliLines());
+        for (SmaliLine smaliLine : referencedInLines) {
+            String text = smaliLine.getText();
+            String newText = text.replace(this.getSmaliPackage(), renameFileTo.getSmaliPackage());
+            smaliLine.setText(newText);
+        }
+
+        HashMap<String, String> renameMap = APKInfo.getInstance().getNewToOldRenamedFilePathMap();
+        renameMap.put(renameFileTo.getAbsolutePath(), this.getAbsolutePath());
+
+        // rename references in XML
+        SmaliLine source = this.getFirstWordSmaliLineMap().get(".source").get(0);
+        source.setText(".source \"WHY_ARE_YOU_HERE.java\"");
     }
 
     public ArrayList<SmaliMethod> getMethodList() {

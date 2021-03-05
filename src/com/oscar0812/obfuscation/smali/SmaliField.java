@@ -70,7 +70,14 @@ public class SmaliField implements SmaliBlock {
     // return the new identifier
     @Override
     public void rename() {
-        rename(getAvailableID());
+        HashMap<String, String> nameChanges = parentNameChanges();
+        String newName;
+        if (nameChanges.containsKey(this.getIdentifier())) {
+            newName = nameChanges.get(this.getIdentifier());
+        } else {
+            newName = getAvailableID();
+        }
+        rename(newName);
     }
 
     public void rename(String newFieldName) {

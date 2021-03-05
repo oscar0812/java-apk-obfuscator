@@ -1,5 +1,7 @@
 package com.oscar0812.obfuscation.smali;
 
+import com.oscar0812.obfuscation.utils.StringUtils;
+
 import java.util.*;
 
 public class SmaliMethod implements SmaliBlock {
@@ -76,6 +78,21 @@ public class SmaliMethod implements SmaliBlock {
     }
 
     @Override
+    public String getAvailableID() {
+        Set<String> takenIDs = getTakenIDs();
+        ArrayList<String> permutations = StringUtils.getStringPermutations();
+
+        for (String perm : permutations) {
+            if (!takenIDs.contains(perm + appendAfterName())) {
+                // new!
+                return perm + appendAfterName();
+            }
+        }
+
+        return "";
+    }
+
+    @Override
     public void rename() {
         String oldMethodID = this.getIdentifier();
         String newMethodID;
@@ -83,9 +100,6 @@ public class SmaliMethod implements SmaliBlock {
         if (nameChanges.containsKey(this.getIdentifier())) {
             // parent already renamed this
             newMethodID = nameChanges.get(this.getIdentifier());
-        }else if(isAbstract() && getParentFile().isAbstract()) {
-            // special case: abstract classes
-            newMethodID = getAvailableID();
         } else if (!this.canRename()) {
             // don't rename these
             return;
@@ -194,13 +208,13 @@ public class SmaliMethod implements SmaliBlock {
     }
 
     public boolean isAbstract() {
-        return this.getFirstSmaliLine().getPartsSet().contains("abstract");
+        return this.getFirstSmaliLine().getPartsSet().contains("abstract") && this.getParentFile().isAbstract();
     }
 
     public boolean canRename() {
         // TODO: make renaming virtual methods possible:
         // renaming parent - child functions messes up stuff, but how do I check all parents???
-        return (!isConstructor() && !isSynthetic() && !isVirtual());
+        return (!isConstructor() && !isSynthetic() && !isVirtual()); //|| isAbstract();
     }
 
     public String getMethodName() {

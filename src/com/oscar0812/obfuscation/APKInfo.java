@@ -25,12 +25,18 @@ public class APKInfo {
     private final HashMap<String, SmaliFile> RFileMap = new HashMap<>();
 
     private final HashMap<String, SmaliFile> allSmaliFileMap = new HashMap<>();
-    private final HashMap<String, SmaliFile> projectSmaliFiles = new HashMap<>();
+    private final HashMap<String, SmaliFile> projectSmaliFileMap = new HashMap<>();
+    private final HashMap<String, SmaliFile> createdSmaliFileMap = new HashMap<>();
 
     private final ArrayList<File> manifestAppFileList = new ArrayList<>();
+
+    private String manifestPackageStr;
     private final HashMap<String, File> manifestAppFileMap = new HashMap<>();
 
     private final HashMap<String, String> pathToPackage = new HashMap<>();
+
+    // store the new file name -> old file name, after rename()
+    private final HashMap<String, String> newToOldRenamedFilePathMap = new HashMap<>();
 
     private static APKInfo instance = null;
 
@@ -95,13 +101,19 @@ public class APKInfo {
         return allSmaliFileMap;
     }
 
-    public HashMap<String, SmaliFile> getProjectSmaliFiles() {
-        return projectSmaliFiles;
+    public HashMap<String, SmaliFile> getProjectSmaliFileMap() {
+        return projectSmaliFileMap;
+    }
+
+    public HashMap<String, SmaliFile> getCreatedSmaliFileMap() {
+        return createdSmaliFileMap;
     }
 
     public void addSmaliFile(SmaliFile smaliFile) {
         // quick access through path
-        assert !this.allSmaliFileMap.containsKey(smaliFile.getAbsolutePath());
+        if(!smaliFile.exists()) {
+            createdSmaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
+        }
         this.allSmaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
     }
 
@@ -125,6 +137,7 @@ public class APKInfo {
 
         assert document != null;
         Element manifestTag = document.getRootElement();
+        this.manifestPackageStr = manifestTag.attributeValue("package");
 
         Set<String> visitedFiles = new HashSet<>();
 
@@ -166,7 +179,7 @@ public class APKInfo {
             for (File childFile : files) {
                 if (childFile.isFile()) {
                     String name = childFile.getName();
-                    if(name.endsWith(".smali")) {
+                    if (name.endsWith(".smali")) {
                         SmaliFile smaliFile = new SmaliFile(childFile.getAbsolutePath());
                         allSmaliFileMap.put(childFile.getAbsolutePath(), smaliFile);
 
@@ -180,7 +193,6 @@ public class APKInfo {
                                 RFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
                             }
                         }
-
                     }
                 } else if (childFile.isDirectory()) {
                     // found directory
@@ -193,17 +205,22 @@ public class APKInfo {
     private File fetchProjectMainDir() {
         // ok got the main files, now search for R.smali, that should tell us what the root directory of the apk is
         HashMap<String, ArrayList<SmaliFile>> dirToRFiles = new HashMap<>();
-        for(SmaliFile rSmaliFile: this.getRFileMap().values()) {
-            if(!dirToRFiles.containsKey(rSmaliFile.getParentFile().getAbsolutePath())) {
+        String packageToDir = manifestPackageStr.replace(".", File.separator);
+        for (SmaliFile rSmaliFile : this.getRFileMap().values()) {
+            if (!rSmaliFile.getAbsolutePath().contains(packageToDir)) {
+                continue;
+            }
+
+            if (!dirToRFiles.containsKey(rSmaliFile.getParentFile().getAbsolutePath())) {
                 dirToRFiles.put(rSmaliFile.getParentFile().getAbsolutePath(), new ArrayList<>());
             }
             dirToRFiles.get(rSmaliFile.getParentFile().getAbsolutePath()).add(rSmaliFile);
         }
 
-        for(File manifestFile: manifestAppFileList) {
+        for (File manifestFile : manifestAppFileList) {
             File bubbler = manifestFile;
             while (!bubbler.getAbsolutePath().equals(smaliDir.getAbsolutePath())) {
-                if(dirToRFiles.containsKey(bubbler.getAbsolutePath())) {
+                if (dirToRFiles.containsKey(bubbler.getAbsolutePath())) {
                     return bubbler;
                 }
                 bubbler = bubbler.getParentFile();
@@ -232,7 +249,7 @@ public class APKInfo {
             for (File file : files) {
                 if (file.isFile()) {
                     if (allSmaliFileMap.containsKey(file.getAbsolutePath())) {
-                        projectSmaliFiles.put(file.getAbsolutePath(), allSmaliFileMap.get(file.getAbsolutePath()));
+                        projectSmaliFileMap.put(file.getAbsolutePath(), allSmaliFileMap.get(file.getAbsolutePath()));
                     }
                 } else if (file.isDirectory()) {
                     // found directory
@@ -254,4 +271,7 @@ public class APKInfo {
         return pathToPackage;
     }
 
+    public HashMap<String, String> getNewToOldRenamedFilePathMap() {
+        return newToOldRenamedFilePathMap;
+    }
 }
