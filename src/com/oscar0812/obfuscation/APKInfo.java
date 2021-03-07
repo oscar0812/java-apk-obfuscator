@@ -21,7 +21,6 @@ public class APKInfo {
     private File apkDecompileDir;
     private File smaliDir, resDir;
 
-    private File mainProjectDir;
     private final HashMap<String, SmaliFile> RFileMap = new HashMap<>();
 
     private final HashMap<String, SmaliFile> allSmaliFileMap = new HashMap<>();
@@ -31,12 +30,12 @@ public class APKInfo {
     private final ArrayList<File> manifestAppFileList = new ArrayList<>();
 
     private String manifestPackageStr;
-    private final HashMap<String, File> manifestAppFileMap = new HashMap<>();
 
-    private final HashMap<String, String> pathToPackage = new HashMap<>();
+    private final HashMap<String, String> dirPathToPackage = new HashMap<>();
 
     // store the new file name -> old file name, after rename()
     private final HashMap<String, String> newToOldRenamedFilePathMap = new HashMap<>();
+    private final HashMap<String, String> oldSmaliPackageToNew = new HashMap<>();
 
     private static APKInfo instance = null;
 
@@ -70,7 +69,7 @@ public class APKInfo {
 
                 // TODO: what about apks with smali/ AND smali_classes2/
                 smaliDir = new File(apkDecompileDir, "smali");
-                pathToPackage.put(smaliDir.getAbsolutePath(), ""); // base package
+                dirPathToPackage.put(smaliDir.getAbsolutePath(), ""); // base package
 
                 resDir = new File(apkDecompileDir, "res");
             }
@@ -153,7 +152,6 @@ public class APKInfo {
                     if (!visitedFiles.contains(file.getAbsolutePath())) {
                         if (file.exists()) {
                             manifestAppFileList.add(file);
-                            manifestAppFileMap.put(file.getAbsolutePath(), file);
                         }
                         visitedFiles.add(file.getAbsolutePath());
                     }
@@ -230,7 +228,7 @@ public class APKInfo {
     }
 
     private void fetchProjectSmaliFiles() {
-        mainProjectDir = fetchProjectMainDir();
+        File mainProjectDir = fetchProjectMainDir();
         assert mainProjectDir != null;
 
         // got R.smali, now get all files in smali/main_package directory
@@ -263,15 +261,23 @@ public class APKInfo {
         return apkName;
     }
 
+    public String getManifestPackageStr() {
+        return manifestPackageStr;
+    }
+
     public HashMap<String, SmaliFile> getRFileMap() {
         return RFileMap;
     }
 
-    public HashMap<String, String> getPathToPackage() {
-        return pathToPackage;
+    public HashMap<String, String> getDirPathToPackage() {
+        return dirPathToPackage;
     }
 
     public HashMap<String, String> getNewToOldRenamedFilePathMap() {
         return newToOldRenamedFilePathMap;
+    }
+
+    public HashMap<String, String> getOldSmaliPackageToNew() {
+        return oldSmaliPackageToNew;
     }
 }

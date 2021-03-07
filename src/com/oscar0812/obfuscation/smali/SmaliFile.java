@@ -65,7 +65,7 @@ public class SmaliFile extends File {
     private void setPackageFromPath() {
         // get package. Bubble up to known parent
         Stack<File> packageStack = new Stack<>();
-        HashMap<String, String> pathToPackage = APKInfo.getInstance().getPathToPackage();
+        HashMap<String, String> pathToPackage = APKInfo.getInstance().getDirPathToPackage();
 
         File bubbler = this.getParentFile();
         while (!pathToPackage.containsKey(bubbler.getAbsolutePath())) {
@@ -243,8 +243,12 @@ public class SmaliFile extends File {
             smaliLine.setText(newText);
         }
 
-        HashMap<String, String> renameMap = APKInfo.getInstance().getNewToOldRenamedFilePathMap();
-        renameMap.put(renameFileTo.getAbsolutePath(), this.getAbsolutePath());
+        // store the file name change. new -> old, old -> new
+        HashMap<String, String> newToOldMap = APKInfo.getInstance().getNewToOldRenamedFilePathMap();
+        newToOldMap.put(renameFileTo.getAbsolutePath(), this.getAbsolutePath());
+
+        HashMap<String, String> oldSmaliPackageToNew = APKInfo.getInstance().getOldSmaliPackageToNew();
+        oldSmaliPackageToNew.put(this.getSmaliPackage(), renameFileTo.getSmaliPackage());
 
         // rename references in XML
         SmaliLine source = this.getFirstWordSmaliLineMap().get(".source").get(0);

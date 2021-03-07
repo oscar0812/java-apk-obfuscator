@@ -184,11 +184,9 @@ public class MainClass {
 
     private void obfuscateRSmaliAndXML() {
         ResourceInfo.getInstance().parseValuesDir();
-        // obfuscate R files and XML
-        // I will first rename all the fields in res/values folders, and keep a history, then
-        // I will look through all R.smali files and see if the they have any fields I changed
         HashMap<String, String> publicXMLNameMap = ResourceInfo.getInstance().getXMLNameAttrChangeMap();
 
+        // loop through R.smali files
         for (SmaliFile smaliFile : APKInfo.getInstance().getRFileMap().values()) {
             String fn = smaliFile.getName();
             if (fn.equals("R$attr.smali")) {
@@ -203,10 +201,10 @@ public class MainClass {
                 String identifier = null;
                 if (publicXMLNameMap.containsKey(smaliField.getIdentifier())) {
                     identifier = smaliField.getIdentifier();
-
                 } else if (publicXMLNameMap.containsKey(smaliToXMLName)) {
                     identifier = smaliToXMLName;
                 }
+
                 if (identifier != null) {
                     smaliField.rename(publicXMLNameMap.get(identifier).replaceAll("[.]+", "_"));
                 }
@@ -218,6 +216,7 @@ public class MainClass {
         ResourceInfo.getInstance().getAllXMLFiles().put(androidManifest.getAbsolutePath(), androidManifest);
         for (XMLFile xmlFile : ResourceInfo.getInstance().getAllXMLFiles().values()) {
             xmlFile.processLines();
+            xmlFile.saveToDisk();
         }
     }
 

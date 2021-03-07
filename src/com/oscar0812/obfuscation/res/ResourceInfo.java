@@ -3,13 +3,18 @@ package com.oscar0812.obfuscation.res;
 import com.oscar0812.obfuscation.APKInfo;
 import com.oscar0812.obfuscation.utils.StringUtils;
 import org.dom4j.Document;
-import org.dom4j.DocumentException;
 import org.dom4j.Element;
-import org.dom4j.io.SAXReader;
 
 import java.io.File;
 import java.util.*;
 
+
+/**
+ * This class reads all the res/values-* files and:
+ * gets/changes attributes
+ * gets unique xml new name (to rename later)
+ *
+ */
 public class ResourceInfo {
     private static ResourceInfo instance = null;
 
@@ -23,7 +28,11 @@ public class ResourceInfo {
 
     private final HashMap<String, ArrayList<File>> nameNoExtensionToFile = new HashMap<>();
 
+    // old_attr_name -> new_attr_name
     public HashMap<String, String> XMLNameAttrChangeMap = new HashMap<>();
+
+    // xml files in res/values-* folders
+    // {"values"=> [arrays.xml, ...], "values-af"=> ["strings.xml"], ...}
     public HashMap<String, ArrayList<File>> valueXMLFiles = new HashMap<>();
 
     private final HashMap<String, XMLFile> allXMLFiles = new HashMap<>();
@@ -41,34 +50,30 @@ public class ResourceInfo {
         fetchFiles();
     }
 
-    private void workOnType(HashMap<String, ArrayList<File>> nameNoExtensionToFileCopy) {
-        for (String key : valueXMLFiles.keySet()) {
-            for (File valueXMLFile : valueXMLFiles.get(key)) {
-                Document document = parseValueXML(valueXMLFile, nameNoExtensionToFileCopy);
-                XMLFile.saveXMLFile(valueXMLFile, document);
-            }
-        }
-    }
-
     public void parseValuesDir() {
         // we need a copy, don't want to mess around with og hashmap
         HashMap<String, ArrayList<File>> nameNoExtensionToFileCopy = new HashMap<>(nameNoExtensionToFile);
 
         // first parse public.xml as it contains all elements
-        XMLFile publicXMLFile = new XMLFile(APKInfo.getInstance().getResDir(), "values" + File.separator + "public.xml");
+        XMLFile publicXMLFile = new XMLFile(valueXMLFiles.get("public").get(0).getAbsolutePath());
         valueXMLFiles.remove("public");
+        Document document = parseValueXML(publicXMLFile, nameNoExtensionToFileCopy);
+        XMLFile.saveXMLFile(publicXMLFile, document);
 
         // ignore styles and attributes
         valueXMLFiles.remove("attrs");
 
-        Document document = parseValueXML(publicXMLFile, nameNoExtensionToFileCopy);
-        XMLFile.saveXMLFile(publicXMLFile, document);
-
-        workOnType(nameNoExtensionToFileCopy);
+        // loop through all res/values-* files
+        for (String key : valueXMLFiles.keySet()) {
+            for (File valueXMLFile : valueXMLFiles.get(key)) {
+                document = parseValueXML(valueXMLFile, nameNoExtensionToFileCopy);
+                XMLFile.saveXMLFile(valueXMLFile, document);
+            }
+        }
     }
 
     private Document parseValueXML(File valueXMLFile, HashMap<String, ArrayList<File>> nameNoExtensionToFileCopy) {
-        Document doc = readXMLFile(valueXMLFile);
+        Document doc = XMLFile.readXMLFile(valueXMLFile);
         assert doc != null;
 
         Queue<Element> q = new LinkedList<>();
@@ -82,6 +87,8 @@ public class ResourceInfo {
             }
 
             String name = qElement.attributeValue("name");
+
+            // public.xml has type attr
             String type = qElement.attributeValue("type");
 
             if (name != null && !name.isEmpty() && !name.startsWith("android:")) {
@@ -91,7 +98,8 @@ public class ResourceInfo {
                     newName = addToRenameMap(name, nameNoExtensionToFileCopy);
                 }
                 // bug with attributes
-                if (type != null && (!type.equals("attr"))) {
+                if (type != null && !type.equals("attr")) {
+                    // public.xml
                     if (!XMLNameAttrChangeMap.containsKey(name)) {
                         if (newName == null) {
                             newName = PRE + permutations.get(permIndex++);
@@ -113,7 +121,10 @@ public class ResourceInfo {
         return doc;
     }
 
+    // rename xml file
     private String addToRenameMap(String name, HashMap<String, ArrayList<File>> nameNoExtensionToFileCopy) {
+        // loop through all the files in the same directory as the files you want to rename.
+        // choose a name that is not taken
         HashMap<String, File> allChildrenFiles = new HashMap<>();
         for (File renameChild : nameNoExtensionToFileCopy.get(name)) {
             File[] siblingList = renameChild.getParentFile().listFiles();
@@ -143,15 +154,6 @@ public class ResourceInfo {
 
         nameNoExtensionToFileCopy.remove(name);
         return newName;
-    }
-
-    public static Document readXMLFile(File XMLFile) {
-        try {
-            return new SAXReader().read(XMLFile);
-        } catch (DocumentException e) {
-            e.printStackTrace();
-            return null;
-        }
     }
 
     // go into res/ and fetch all files, keep a hashmap of files without extension since xml refers to some files that way
@@ -200,10 +202,6 @@ public class ResourceInfo {
 
     public HashMap<String, XMLFile> getAllXMLFiles() {
         return allXMLFiles;
-    }
-
-    public HashMap<String, ArrayList<File>> getNameNoExtensionToFile() {
-        return nameNoExtensionToFile;
     }
 
     public HashMap<String, String> getXMLNameAttrChangeMap() {
