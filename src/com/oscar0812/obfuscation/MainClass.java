@@ -250,7 +250,6 @@ public class MainClass {
         for(String newFilePath: renamedMap.keySet()) {
             String oldFilePath = renamedMap.get(newFilePath);
             SmaliFile smaliFile = allSmaliMap.get(oldFilePath);
-            // TODO: MIGHT need to change smaliFile package
 
             allSmaliMap.put(newFilePath, allSmaliMap.remove(smaliFile.getAbsolutePath()));
             projectSmaliMap.put(newFilePath, projectSmaliMap.remove(smaliFile.getAbsolutePath()));
@@ -323,8 +322,6 @@ public class MainClass {
         APKInfo.getInstance().fetchDecompiledInfo();
 
         System.out.println("==== DONE DECOMPILING ====");
-        // TODO: work on obfuscate
-
         obfuscate();
 
         buildWithAPKTool(outputDir);
@@ -332,14 +329,8 @@ public class MainClass {
 
     }
 
-    // TODO: what about reflective methods?
-    // obfuscate xml?
-    // obfuscate assets?
-
     public static void main(String[] args) {
         MainClass m = new MainClass();
         m.start();
-
-        // SmaliStringObfuscator s = new SmaliStringObfuscator()
     }
 }
