@@ -380,7 +380,7 @@ public class MainClass {
 
             obfuscateMethods(smaliFile);
             obfuscateFields(smaliFile);
-            // deleteDebugLines(smaliFile);
+            deleteDebugLines(smaliFile);
 
             // other...
         }
@@ -404,12 +404,10 @@ public class MainClass {
     }
 
     private void start() {
-        APKInfo.setApkName("timber.apk");
-
-        // APKInfo.setApkName("sample_navigation.apk");
+        APKInfo.setAPKPath("C:\\Users\\oscar\\IdeaProjects\\APKobfuscation\\apks\\timber.apk");
         APKInfo info = APKInfo.getInstance();
         File apkFile = info.getApkFile();
-        File apkDir = info.getProjectApkDir();
+        File apkParentDir = info.getApkParentDir();
         File outputDir = info.getApkDecompileDir();
 
         decompileWithAPKTool(apkFile, outputDir);
@@ -419,8 +417,7 @@ public class MainClass {
         obfuscate();
 
         buildWithAPKTool(outputDir);
-        signAPKWithUber(apkFile, apkDir, outputDir);
-
+        signAPKWithUber(apkFile, apkParentDir, outputDir);
     }
 
     public static void main(String[] args) {

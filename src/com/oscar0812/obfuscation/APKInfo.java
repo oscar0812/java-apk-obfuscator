@@ -16,9 +16,11 @@ import java.util.*;
  * Single DEX android applications have a method number limit of 65,536
  */
 public class APKInfo {
-    private static String apkName;
-    private final File projectApkDir;
-    private File apkFile;
+    private static String apkPath;
+    private final File apkFile;
+    // dir where .apk resides
+    private final File apkParentDir;
+
     private File apkDecompileDir;
     private File smaliDir, resDir, mainProjectDir;
 
@@ -50,37 +52,32 @@ public class APKInfo {
         return instance;
     }
 
-    public static void setApkName(String inName) {
-        apkName = inName;
+    public static void setAPKPath(String inPath) {
+        apkPath = inPath;
         instance = new APKInfo();
     }
 
     private APKInfo() {
-        // apk has to be in apks/ folder
-        projectApkDir = new File(System.getProperty("user.dir") + File.separator + "apks");
-        if (!projectApkDir.exists()) {
-            System.out.println("No APKS directory");
+        apkFile = new File(apkPath);
+        apkParentDir = apkFile.getParentFile();
+
+        if (!apkFile.exists()) {
+            System.out.println("APK file doesn't exist");
         } else {
-            // exists
-            apkFile = new File(projectApkDir, apkName);
+            // remove the .apk and make it a directory for output (apktool write)
+            apkDecompileDir = new File(apkFile.getAbsolutePath().substring(0, apkFile.getAbsolutePath().lastIndexOf('.')));
 
-            if (!apkFile.exists()) {
-                System.out.println("APK file doesn't exist");
-            } else {
-                // remove the .apk and make it a directory for output (apktool write)
-                apkDecompileDir = new File(apkFile.getAbsolutePath().substring(0, apkFile.getAbsolutePath().lastIndexOf('.')));
+            // TODO: what about apks with smali/ AND smali_classes2/
+            smaliDir = new File(apkDecompileDir, "smali");
+            dirPathToPackage.put(smaliDir.getAbsolutePath(), ""); // base package
 
-                // TODO: what about apks with smali/ AND smali_classes2/
-                smaliDir = new File(apkDecompileDir, "smali");
-                dirPathToPackage.put(smaliDir.getAbsolutePath(), ""); // base package
-
-                resDir = new File(apkDecompileDir, "res");
-            }
+            resDir = new File(apkDecompileDir, "res");
         }
+
     }
 
-    public File getProjectApkDir() {
-        return projectApkDir;
+    public File getApkParentDir() {
+        return apkParentDir;
     }
 
     public File getApkFile() {
@@ -278,10 +275,6 @@ public class APKInfo {
                 }
             }
         }
-    }
-
-    public String getName() {
-        return apkName;
     }
 
     public String getManifestPackageStr() {
