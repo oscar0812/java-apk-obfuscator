@@ -13,38 +13,38 @@ public class SmaliFile extends File {
     private SmaliLine firstSmaliLine = null;
     private SmaliLine lastSmaliLine = null;
 
-    private HashMap<String, ArrayList<SmaliLine>> firstWordSmaliLineMap = new HashMap<>(); // first word->list[SmaliLines]: ".field"->[....], "const-string"->[...]
+    private final HashMap<String, ArrayList<SmaliLine>> firstWordSmaliLineMap = new HashMap<>(); // first word->list[SmaliLines]: ".field"->[....], "const-string"->[...]
     private SmaliLine lastDescriptiveComment = null;
 
     // what lines reference/link/use this file
-    private ArrayList<SmaliLine> referencedInlines = new ArrayList<>();
+    private final ArrayList<SmaliLine> referencedInlines = new ArrayList<>();
     private String smaliPackage = "";
     private String smaliClass = "";
 
     // field lines
-    private ArrayList<SmaliField> fieldList = new ArrayList<>();
-    private HashMap<String, SmaliField> fieldMap = new HashMap<>();
+    private final ArrayList<SmaliField> fieldList = new ArrayList<>();
+    private final HashMap<String, SmaliField> fieldMap = new HashMap<>();
 
     // file lines (parent - child)
-    private HashMap<String, SmaliFile> childFileMap = new HashMap<>();
-    private HashMap<String, SmaliFile> parentFileMap = new HashMap<>();
+    private final HashMap<String, SmaliFile> childFileMap = new HashMap<>();
+    private final HashMap<String, SmaliFile> parentFileMap = new HashMap<>();
 
     // married share a child file
-    private HashMap<String, SmaliFile> marriedFileMap = new HashMap<>();
+    private final HashMap<String, SmaliFile> marriedFileMap = new HashMap<>();
 
     // method blocks
-    private ArrayList<SmaliMethod> methodList = new ArrayList<>();
+    private final ArrayList<SmaliMethod> methodList = new ArrayList<>();
 
     // getCurrentTrack() -> SmaliMethod
-    private HashMap<String, SmaliMethod> methodMap = new HashMap<>();
+    private final HashMap<String, SmaliMethod> methodMap = new HashMap<>();
 
-    private HashMap<String, String> methodNameChange = new HashMap<>();
-    private HashMap<String, String> fieldNameChange = new HashMap<>();
+    private final HashMap<String, String> methodNameChange = new HashMap<>();
+    private final HashMap<String, String> fieldNameChange = new HashMap<>();
 
-    private HashMap<String, ArrayList<SmaliLine>> methodReferences = new HashMap<>(); // link method name to lines that reference it
-    private HashMap<String, ArrayList<SmaliLine>> fieldReferences = new HashMap<>();  // link field name to lines that reference it
+    private final HashMap<String, ArrayList<SmaliLine>> methodReferences = new HashMap<>(); // link method name to lines that reference it
+    private final HashMap<String, ArrayList<SmaliLine>> fieldReferences = new HashMap<>();  // link field name to lines that reference it
 
-    public long debugLine = 50;
+    // public long debugLine = 50;
 
     public SmaliFile(String pathname) {
         super(pathname);
@@ -97,8 +97,8 @@ public class SmaliFile extends File {
         // check if parent - child
         String firstWord = inLine.getParts()[0];
         if (firstWord.equals(".implements") || firstWord.equals(".super")) {
-            this.getChildFileMap().put(inLine.getParentFile().getAbsolutePath(), inLine.getParentFile());
-            inLine.getParentFile().getParentFileMap().put(this.getAbsolutePath(), this);
+            this.getChildFileMap().put(inLine.getParentSmaliFile().getAbsolutePath(), inLine.getParentSmaliFile());
+            inLine.getParentSmaliFile().getParentFileMap().put(this.getAbsolutePath(), this);
         }
     }
 
@@ -218,8 +218,9 @@ public class SmaliFile extends File {
 
     // check all files in the same directory, and rename to something that doesnt exist
     private File getNewFile() {
-        File parent = this.getParentFile();
+        File parent = SmaliFile.getCreatedSmaliDir(this);
         ArrayList<String> permutations = StringUtils.getStringPermutations();
+
         for (String perm : permutations) {
             File newFile = new File(parent, perm + ".smali");
             if (!newFile.exists() && !APKInfo.getInstance().getAllSmaliFileMap().containsKey(newFile.getAbsolutePath())
@@ -253,6 +254,18 @@ public class SmaliFile extends File {
         // rename references in XML
         SmaliLine source = this.getFirstWordSmaliLineMap().get(".source").get(0);
         source.setText(".source \"WHY_ARE_YOU_HERE.java\"");
+    }
+
+    // return the new name for the parent dir (package rename)
+    public static File getCreatedSmaliDir(File inFile) {
+        File parentDir = inFile.getParentFile();
+        HashMap<String, File> oldToNewSmaliDirMap = APKInfo.getInstance().getOldToNewSmaliDirMap();
+
+        if(oldToNewSmaliDirMap.containsKey(parentDir.getAbsolutePath())) {
+            return oldToNewSmaliDirMap.get(parentDir.getAbsolutePath());
+        }
+
+        return parentDir;
     }
 
     public ArrayList<SmaliMethod> getMethodList() {

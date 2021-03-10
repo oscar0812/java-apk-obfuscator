@@ -2,6 +2,7 @@ package com.oscar0812.obfuscation;
 
 import com.oscar0812.obfuscation.res.ResourceInfo;
 import com.oscar0812.obfuscation.smali.SmaliFile;
+import com.oscar0812.obfuscation.utils.StringUtils;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
@@ -19,15 +20,18 @@ public class APKInfo {
     private final File projectApkDir;
     private File apkFile;
     private File apkDecompileDir;
-    private File smaliDir, resDir;
+    private File smaliDir, resDir, mainProjectDir;
 
     private final HashMap<String, SmaliFile> RFileMap = new HashMap<>();
-
     private final HashMap<String, SmaliFile> allSmaliFileMap = new HashMap<>();
     private final HashMap<String, SmaliFile> projectSmaliFileMap = new HashMap<>();
     private final HashMap<String, SmaliFile> createdSmaliFileMap = new HashMap<>();
 
     private final ArrayList<File> manifestAppFileList = new ArrayList<>();
+
+    // keep track of the smali directories inside smali/
+    private final ArrayList<File> projectFirstChildDirs = new ArrayList<>();
+    private final HashMap<String, File> oldToNewSmaliDirMap = new HashMap<>();
 
     private String manifestPackageStr;
 
@@ -46,10 +50,9 @@ public class APKInfo {
         return instance;
     }
 
-    public static APKInfo setApkName(String inName) {
+    public static void setApkName(String inName) {
         apkName = inName;
         instance = new APKInfo();
-        return instance;
     }
 
     private APKInfo() {
@@ -110,7 +113,7 @@ public class APKInfo {
 
     public void addSmaliFile(SmaliFile smaliFile) {
         // quick access through path
-        if(!smaliFile.exists()) {
+        if (!smaliFile.exists()) {
             createdSmaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
         }
         this.allSmaliFileMap.put(smaliFile.getAbsolutePath(), smaliFile);
@@ -209,10 +212,11 @@ public class APKInfo {
                 continue;
             }
 
-            if (!dirToRFiles.containsKey(rSmaliFile.getParentFile().getAbsolutePath())) {
-                dirToRFiles.put(rSmaliFile.getParentFile().getAbsolutePath(), new ArrayList<>());
+            File rParent = rSmaliFile.getParentFile();
+            if (!dirToRFiles.containsKey(rParent.getAbsolutePath())) {
+                dirToRFiles.put(rParent.getAbsolutePath(), new ArrayList<>());
             }
-            dirToRFiles.get(rSmaliFile.getParentFile().getAbsolutePath()).add(rSmaliFile);
+            dirToRFiles.get(rParent.getAbsolutePath()).add(rSmaliFile);
         }
 
         for (File manifestFile : manifestAppFileList) {
@@ -228,7 +232,7 @@ public class APKInfo {
     }
 
     private void fetchProjectSmaliFiles() {
-        File mainProjectDir = fetchProjectMainDir();
+        mainProjectDir = fetchProjectMainDir();
         assert mainProjectDir != null;
 
         // got R.smali, now get all files in smali/main_package directory
@@ -238,19 +242,38 @@ public class APKInfo {
 
         while (!q.isEmpty()) {
             File parent = q.poll(); // retrieve and remove the first element
-            File[] files = parent.listFiles();
+            File[] listFiles = parent.listFiles();
 
-            if (files == null) {
+            if (listFiles == null || listFiles.length == 0) {
                 continue;
             }
 
-            for (File file : files) {
+            for (File file : listFiles) {
                 if (file.isFile()) {
                     if (allSmaliFileMap.containsKey(file.getAbsolutePath())) {
                         projectSmaliFileMap.put(file.getAbsolutePath(), allSmaliFileMap.get(file.getAbsolutePath()));
                     }
                 } else if (file.isDirectory()) {
                     // found directory
+                    if (file.getParentFile().getAbsolutePath().equals(mainProjectDir.getAbsolutePath())) {
+                        projectFirstChildDirs.add(file);
+                    }
+
+                    // to rename packages we will first create the directories and set a link between the old
+                    // dir and the new one
+                    if (oldToNewSmaliDirMap.containsKey(file.getParentFile().getAbsolutePath())) {
+                        // contains the parent
+                        parent = oldToNewSmaliDirMap.get(file.getParentFile().getAbsolutePath());
+                    }
+
+                    for (String perm : StringUtils.getStringPermutations()) {
+                        File newDir = new File(parent, perm);
+                        if (!newDir.exists()) {
+                            newDir.mkdir();
+                            oldToNewSmaliDirMap.put(file.getAbsolutePath(), newDir);
+                            break;
+                        }
+                    }
                     q.add(file);
                 }
             }
@@ -263,6 +286,10 @@ public class APKInfo {
 
     public String getManifestPackageStr() {
         return manifestPackageStr;
+    }
+
+    public File getMainProjectDir() {
+        return mainProjectDir;
     }
 
     public HashMap<String, SmaliFile> getRFileMap() {
@@ -279,5 +306,13 @@ public class APKInfo {
 
     public HashMap<String, String> getOldSmaliPackageToNew() {
         return oldSmaliPackageToNew;
+    }
+
+    public ArrayList<File> getProjectFirstChildDirs() {
+        return projectFirstChildDirs;
+    }
+
+    public HashMap<String, File> getOldToNewSmaliDirMap() {
+        return oldToNewSmaliDirMap;
     }
 }

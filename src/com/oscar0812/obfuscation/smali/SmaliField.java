@@ -50,7 +50,7 @@ public class SmaliField implements SmaliBlock {
 
     @Override
     public SmaliFile getParentFile() {
-        return this.getSmaliLine().getParentFile();
+        return this.getSmaliLine().getParentSmaliFile();
     }
 
     @Override
@@ -103,27 +103,27 @@ public class SmaliField implements SmaliBlock {
             builder.append(" ");
         }
 
-        this.getSmaliLine().getParentFile().getFieldNameChange().put(oldFieldName, newFieldName);
+        this.getSmaliLine().getParentSmaliFile().getFieldNameChange().put(oldFieldName, newFieldName);
 
         // 2. make a new field line
-        SmaliLine newFieldLine = new SmaliLine(builder.toString().stripTrailing(), this.getSmaliLine().getParentFile());
+        SmaliLine newFieldLine = new SmaliLine(builder.toString().stripTrailing(), this.getSmaliLine().getParentSmaliFile());
         this.getSmaliLine().getPrevSmaliLine().insertAfter(newFieldLine);
         this.getSmaliLine().delete();
         this.setSmaliLine(newFieldLine);
 
         // 3. unlink method name from parent file
-        HashMap<String, SmaliField> map = this.getSmaliLine().getParentFile().getFieldMap();
+        HashMap<String, SmaliField> map = this.getSmaliLine().getParentSmaliFile().getFieldMap();
         map.put(newFieldName, map.remove(oldFieldName));
 
         // 4. change all lines that called this method by the old name
-        ArrayList<SmaliLine> smaliLinesPointingToThisField = this.getSmaliLine().getParentFile().getFieldReferences().get(oldFieldName);
+        ArrayList<SmaliLine> smaliLinesPointingToThisField = this.getSmaliLine().getParentSmaliFile().getFieldReferences().get(oldFieldName);
 
         if (smaliLinesPointingToThisField == null) {
             smaliLinesPointingToThisField = new ArrayList<>();
         }
 
         // child files may refer to parent file fields
-        for (SmaliFile childFile : this.getSmaliLine().getParentFile().getChildFileMap().values()) {
+        for (SmaliFile childFile : this.getSmaliLine().getParentSmaliFile().getChildFileMap().values()) {
             if (childFile.getFieldReferences().containsKey(oldFieldName)) {
                 smaliLinesPointingToThisField.addAll(childFile.getFieldReferences().get(oldFieldName));
             }
@@ -139,7 +139,7 @@ public class SmaliField implements SmaliBlock {
 
     public boolean canRename() {
         // if its in an R.smali file dont rename
-        return !APKInfo.getInstance().getRFileMap().containsKey(this.getSmaliLine().getParentFile().getAbsolutePath());
+        return !APKInfo.getInstance().getRFileMap().containsKey(this.getSmaliLine().getParentSmaliFile().getAbsolutePath());
     }
 
     public SmaliLine getSmaliLine() {

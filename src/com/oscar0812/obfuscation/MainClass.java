@@ -8,6 +8,7 @@ import com.oscar0812.obfuscation.smali.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /*
  * STEPS:
@@ -132,25 +133,82 @@ public class MainClass {
         if (!smaliLineMap.containsKey("const-string")) {
             return;
         }
+
         ArrayList<SmaliLine> smaliLines = smaliLineMap.get("const-string");
 
         // obfuscate strings
         // DOESN'T WORK: line 16 of SongLoader: "is_music=1 AND title != \'\'"
         for (SmaliLine smaliLine : smaliLines) {
             String[] parts = smaliLine.getParts();
-            // if (parts.length > 2 && parts[parts.length - 1].contains("\\'\\'") && parts[1].equals("v0,")) {
-            if (parts.length > 2 && parts[parts.length - 1].contains("\\")) {
+            if (parts.length > 2 && parts[parts.length - 1].contains("\\'\\'") && parts[1].equals("v0,")) {
+                // if (parts.length > 2 && parts[parts.length - 1].contains("\\")) {
                 // weird case with const-string if it contains \'\' and stored at v0
                 continue;
             }
 
             if (smaliLine.getParentMethod() != null && !smaliLine.isGarbage()) {
-                SmaliMethod smaliMethod = smaliLine.getParentMethod();
-                if (!smaliMethod.isConstructor()) {
+                if (!smaliLine.getParentMethod().isConstructor()) {
                     // dont obfuscate constructor string (for now)
                     SmaliLine obfCall = SmaliLineObfuscator.getInstance().stringToStaticCall(smaliLine);
                     smaliLine.getPrevSmaliLine().insertAfter(obfCall);
                     smaliLine.delete();
+                }
+            }
+        }
+    }
+
+    private void obfuscateInts(SmaliFile smaliFile) {
+        HashMap<String, ArrayList<SmaliLine>> smaliLineMap = smaliFile.getFirstWordSmaliLineMap();
+
+        if (!smaliLineMap.containsKey("const")) {
+            return;
+        }
+
+        ArrayList<SmaliLine> smaliLines = smaliLineMap.get("const");
+
+        // obfuscate const integers/longs
+        for (SmaliLine smaliLine : smaliLines) {
+            if (smaliLine.getParentMethod() != null && !smaliLine.isGarbage()) {
+                if (!smaliLine.getParentMethod().isConstructor()) {
+                    // dont obfuscate constructor const's (for now)
+
+                    String[] parts = smaliLine.getParts();
+                    // const v3, 0x7f060061
+                    // 0x7f060061
+
+                    String hex = parts[parts.length - 1];
+                    boolean negHex = hex.startsWith("-0x");
+                    // 7f060061
+                    hex = hex.substring(hex.indexOf("x") + 1);
+                    int dec = Integer.parseInt(hex, 16);
+
+                    int randomInt = ThreadLocalRandom.current().nextInt(1, 11); // 11 so it can include 10 (0, 10)
+
+                    // v0,
+                    String register = parts[parts.length - 2];
+                    // v0
+                    register = register.substring(0, register.length() - 1);
+
+                    String nextLineNewSmaliText = smaliLine.getWhitespace();
+                    // to keep it in bounds (nothing fancy)
+                    if (negHex) {
+                        // neg.
+                        int javaMin32Bit = -2147483648;
+                        int t = javaMin32Bit + dec;
+                        if(t >=- -11) {
+                            continue; // will overflow, so skip
+                        }
+
+                        dec += randomInt;
+                    } else {
+                        dec -= randomInt;
+                    }
+                    String newSmaliText = smaliLine.getText().replace("0x" + hex, "0x" + Integer.toHexString(Math.abs(dec)));
+                    // add it back in the next line
+                    nextLineNewSmaliText += "add-int/lit8 " + register + ", " + register + ", 0x" + Integer.toHexString(randomInt);
+
+                    smaliLine.setText(newSmaliText);
+                    smaliLine.insertAfter("").insertAfter(nextLineNewSmaliText);
                 }
             }
         }
@@ -237,7 +295,7 @@ public class MainClass {
         HashMap<String, SmaliFile> rFileMap = APKInfo.getInstance().getRFileMap();
 
         for (SmaliFile smaliFile : APKInfo.getInstance().getProjectSmaliFileMap().values()) {
-            if(rFileMap.containsKey(smaliFile.getAbsolutePath())) {
+            if (rFileMap.containsKey(smaliFile.getAbsolutePath())) {
                 continue;
             }
             smaliFile.rename();
@@ -247,15 +305,49 @@ public class MainClass {
         HashMap<String, SmaliFile> allSmaliMap = APKInfo.getInstance().getAllSmaliFileMap();
         HashMap<String, SmaliFile> projectSmaliMap = APKInfo.getInstance().getProjectSmaliFileMap();
 
-        for(String newFilePath: renamedMap.keySet()) {
+        for (String newFilePath : renamedMap.keySet()) {
             String oldFilePath = renamedMap.get(newFilePath);
             SmaliFile smaliFile = allSmaliMap.get(oldFilePath);
 
             allSmaliMap.put(newFilePath, allSmaliMap.remove(smaliFile.getAbsolutePath()));
             projectSmaliMap.put(newFilePath, projectSmaliMap.remove(smaliFile.getAbsolutePath()));
 
-            while(smaliFile.exists() && !smaliFile.delete()) {
+
+            while (smaliFile.exists() && !smaliFile.delete()) {
                 System.out.println("COULDN'T DELETE:: " + smaliFile.getAbsolutePath());
+            }
+        }
+
+        // delete empty directories
+        for (File file : APKInfo.getInstance().getProjectFirstChildDirs()) {
+            Queue<File> q = new LinkedList<>();
+            q.add(file);
+
+            Stack<File> allDirs = new Stack<>();
+
+            while (!q.isEmpty()) {
+                File qDir = q.poll();
+                allDirs.add(qDir);
+
+                File[] listFiles = qDir.listFiles();
+
+                if (listFiles == null || listFiles.length == 0) {
+                    continue;
+                }
+
+                for (File f : listFiles) {
+                    if (f.isDirectory()) {
+                        q.add(f);
+                    } else {
+                        // WE SHOULDN'T DELETE FOLDERS THAT ARE NOT EMPTY
+                        return;
+                    }
+                }
+            }
+
+            // a stack will keep the deepest folders at the top
+            while (!allDirs.empty()) {
+                allDirs.pop().delete();
             }
         }
     }
@@ -284,6 +376,8 @@ public class MainClass {
             // System.out.println("\"" + smaliFile.getAbsolutePath() + "\",");
 
             obfuscateStrings(smaliFile);
+            obfuscateInts(smaliFile);
+
             obfuscateMethods(smaliFile);
             obfuscateFields(smaliFile);
             // deleteDebugLines(smaliFile);
@@ -292,7 +386,7 @@ public class MainClass {
         }
 
         // save the obf string classes to their files, since we need to start renaming
-        for(String path: APKInfo.getInstance().getCreatedSmaliFileMap().keySet()) {
+        for (String path : APKInfo.getInstance().getCreatedSmaliFileMap().keySet()) {
             SmaliFile smaliFile = APKInfo.getInstance().getCreatedSmaliFileMap().get(path);
             smaliFile.saveToDisk(path);
         }
@@ -303,7 +397,7 @@ public class MainClass {
         renameDrawables();
 
         // save everything
-        for(String path: APKInfo.getInstance().getAllSmaliFileMap().keySet()) {
+        for (String path : APKInfo.getInstance().getAllSmaliFileMap().keySet()) {
             SmaliFile smaliFile = APKInfo.getInstance().getAllSmaliFileMap().get(path);
             smaliFile.saveToDisk(path);
         }

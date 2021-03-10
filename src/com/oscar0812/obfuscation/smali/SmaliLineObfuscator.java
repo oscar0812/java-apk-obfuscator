@@ -36,7 +36,8 @@ public class SmaliLineObfuscator {
 
     private SmaliFile createNewFile(SmaliFile siblingFile) {
         // create a file with a name that doesn't exist in the same directory as siblingFile
-        File parent = siblingFile.getParentFile();
+        File parent = SmaliFile.getCreatedSmaliDir(siblingFile);
+
         if(!dirFiles.containsKey(parent.getAbsolutePath())) {
             dirFiles.put(parent.getAbsolutePath(), smaliFilesInDir(parent));
         }
@@ -51,20 +52,12 @@ public class SmaliLineObfuscator {
 
         filePaths.add(fileClassName + ".smali");
 
-        SmaliFile file = new SmaliFile(siblingFile.getParentFile(), fileClassName + ".smali");
-
-        String sp = siblingFile.getSmaliPackage();           // Lcom/oscar0812/sample_navigation/BuildConfig;
-        sp = sp.substring(0, sp.lastIndexOf("/") + 1);      // Lcom/oscar0812/sample_navigation/
-        sp += fileClassName + ";";                            // Lcom/oscar0812/sample_navigation/okxd;
-
-        // set the package and class
-        file.setSmaliPackage(sp);
-        return file;
+        return new SmaliFile(parent, fileClassName + ".smali");
     }
 
     // smali of string obfuscator object (look at StringUtil.smali)
     private SmaliFile createObfFile(SmaliLine line) {
-        SmaliFile obfFile = createNewFile(line.getParentFile());
+        SmaliFile obfFile = createNewFile(line.getParentSmaliFile());
 
         obfFile.appendString(
                 ".class public " + obfFile.getSmaliPackage() + "\n" +
@@ -177,9 +170,8 @@ public class SmaliLineObfuscator {
 
         // add this to the apk (IT IS PART OF IT NOW!)
         APKInfo.getInstance().addSmaliFile(obfFile);
-        SmaliLine smaliLine = new SmaliLine(SmaliLine.SINGLE_SPACE + "invoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", inLine.getParentFile());
-        smaliLine.insertAfter("", smaliLine.getParentFile())
-                .insertAfter(SmaliLine.SINGLE_SPACE + "move-result-object " + register, inLine.getParentFile());
+        SmaliLine smaliLine = new SmaliLine(SmaliLine.SINGLE_SPACE + "invoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", inLine.getParentSmaliFile());
+        smaliLine.insertAfter("").insertAfter(SmaliLine.SINGLE_SPACE + "move-result-object " + register);
 
         return smaliLine;
     }

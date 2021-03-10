@@ -34,7 +34,7 @@ public class SmaliLine {
     private String[] parts;
     private final Set<String> partsSet = new HashSet<>();
 
-    private final SmaliFile parentFile;
+    private final SmaliFile parentSmaliFile;
     private SmaliMethod parentMethod = null; // is this line in a method?
 
     // what files this line points to
@@ -43,8 +43,8 @@ public class SmaliLine {
 
     private boolean isGarbage = false;
 
-    public SmaliLine(String text, SmaliFile parentFile) {
-        this.parentFile = parentFile;
+    public SmaliLine(String text, SmaliFile parentSmaliFile) {
+        this.parentSmaliFile = parentSmaliFile;
         setText(text);
     }
 
@@ -64,11 +64,18 @@ public class SmaliLine {
             int firstQ = trimmed.indexOf("\"", commaIndex + 1);
             int lastQ = trimmed.lastIndexOf("\"");
             partList.add(trimmed.substring(firstQ + 1, lastQ));
-            parts = partList.toArray(new String[0]);
         } else {
             // nothing special? IDK, just split by spaces
-            parts = trimmed.split("\\s+");
+            for(String part: trimmed.split("\\s+")) {
+                if(part.equals("#") && partList.size() > 0) {
+                    // ignore trailing comments
+                    break;
+                }
+                partList.add(part);
+            }
         }
+
+        parts = partList.toArray(new String[0]);
 
         partsSet.clear();
         Collections.addAll(partsSet, parts);
@@ -128,11 +135,11 @@ public class SmaliLine {
 
 
         // check if this line is part of a block (method, annotation, etc)
-        parentFile.addMethodLine(this);
+        parentSmaliFile.addMethodLine(this);
 
         // check if this line is a field
         if (this.getParts()[0].equals(".field")) {
-            parentFile.addFieldLine(this);
+            parentSmaliFile.addFieldLine(this);
         }
     }
 
@@ -168,8 +175,8 @@ public class SmaliLine {
         return partsSet;
     }
 
-    public SmaliFile getParentFile() {
-        return parentFile;
+    public SmaliFile getParentSmaliFile() {
+        return parentSmaliFile;
     }
 
     public void setParentMethod(SmaliMethod parentMethod) {
@@ -221,8 +228,8 @@ public class SmaliLine {
         return rightOfIn;
     }
 
-    public SmaliLine insertAfter(String text, SmaliFile parentFile) {
-        return insertAfter(new SmaliLine(text, parentFile));
+    public SmaliLine insertAfter(String text) {
+        return insertAfter(new SmaliLine(text, this.getParentSmaliFile()));
     }
 
     public SmaliLine getNextSmaliLine() {
@@ -253,7 +260,7 @@ public class SmaliLine {
         return "SmaliLine{" +
                 "originalText='" + text + '\'' +
                 ", parts=" + Arrays.toString(parts) +
-                ", parentFile=" + parentFile +
+                ", parentFile=" + parentSmaliFile +
                 '}';
     }
 }
