@@ -1,20 +1,14 @@
 package com.oscar0812.obfuscation.utils;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class StringUtils {
     private static final ArrayList<String> stringPermutations = new ArrayList<>();
 
-    private static void getAllStringsOfKLength(String prefix, int k, ArrayList<String> arrayList)
-    {
+    private static void getAllStringsOfKLength(String prefix, int k, ArrayList<String> arrayList, int initMaxLength) {
         // Base case: k is 0,
         // print prefix
-        if (k == 0)
-        {
+        if (k == 0) {
             arrayList.add(prefix);
             return;
         }
@@ -22,23 +16,34 @@ public class StringUtils {
         // One by one add all characters
         // from set and recursively
         // call for k equals to k-1
-        for (int i = 97; i <= 122; ++i)
-        {
+        for (int i = 0; i < initMaxLength; ++i) {
 
             // Next character of input added
-            String newPrefix = prefix + (char) i;
+            String newPrefix = prefix + arrayList.get(i);
 
             // k is decreased, because
             // we have added a new character
-            getAllStringsOfKLength(newPrefix,k - 1, arrayList);
+            getAllStringsOfKLength(newPrefix, k - 1, arrayList, initMaxLength);
         }
     }
 
     public static ArrayList<String> getStringPermutations() {
-        if(stringPermutations.size() == 0) {
-            for (int x = 1; x<=4; x++) {
-                getAllStringsOfKLength("", x, stringPermutations);
-            }
+        // int initCh = 0x0001fb00; // boxes
+        // int initCh = 0x00000030; // 0
+        if(stringPermutations.size() > 0) {
+            return stringPermutations;
+        }
+
+        int initCh = 0x00000061; // a
+        int maxChars = 25;
+        int ch = initCh;
+        while (ch < initCh + maxChars) {
+            stringPermutations.add(new String(Character.toChars(ch)));
+            ch += 1;
+        }
+
+        for (int x = 2; x < 5; x++) {
+            getAllStringsOfKLength("", x, stringPermutations, maxChars);
         }
 
         return stringPermutations;
@@ -60,7 +65,7 @@ public class StringUtils {
             // + 1 to include ;
             int indC = input.indexOf(';', indL + 1);
             if (indC > 0) {
-                list.add(new Substring(indL, indC+1, input.substring(indL, indC + 1)));
+                list.add(new Substring(indL, indC + 1, input.substring(indL, indC + 1)));
             }
 
             from = indL + 1;
@@ -72,8 +77,8 @@ public class StringUtils {
 
     public static String getLeadingWhitespace(String text) {
         StringBuilder wsb = new StringBuilder();
-        for (char c: text.toCharArray()) {
-            if(Character.isWhitespace(c)) {
+        for (char c : text.toCharArray()) {
+            if (Character.isWhitespace(c)) {
                 wsb.append(c);
             } else {
                 break;
