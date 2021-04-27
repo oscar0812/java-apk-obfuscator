@@ -3,9 +3,9 @@ package com.oscar0812.obfuscation.smali;
 import com.oscar0812.obfuscation.utils.StringUtils;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class SmaliMethod implements SmaliBlock {
-    private boolean ended;
     private final SmaliFile parentFile;
 
     private SmaliLine firstSmaliLine; // .method ...
@@ -54,7 +54,7 @@ public class SmaliMethod implements SmaliBlock {
     }
 
     @Override
-    public SmaliFile getParentFile() {
+    public SmaliFile getParentSmaliFile() {
         return parentFile;
     }
 
@@ -66,7 +66,7 @@ public class SmaliMethod implements SmaliBlock {
     @Override
     public HashMap<String, String> parentNameChanges() {
         HashMap<String, String> changes = new HashMap<>();
-        for (SmaliFile parentFile : this.getParentFile().getParentFileMap().values()) {
+        for (SmaliFile parentFile : this.getParentSmaliFile().getParentFileMap().values()) {
             changes.putAll(parentFile.getMethodNameChange());
         }
         return changes;
@@ -104,39 +104,32 @@ public class SmaliMethod implements SmaliBlock {
             // don't rename these
             return;
         } else {
-            // 1. get new method name
+            // get new method name
             newMethodID = getAvailableID();
         }
 
-        String[] parts = this.getFirstSmaliLine().getParts();
-        StringBuilder builder = new StringBuilder(this.getFirstSmaliLine().getWhitespace());
+        String[] parts = this.getFirstSmaliLine().getParts().clone();
+        parts[parts.length-1] = newMethodID + this.getMethodReturnType();
 
-        for (int x = 0; x < parts.length - 1; x++) {
-            builder.append(parts[x]);
-            builder.append(" ");
-        }
-        builder.append(newMethodID).append(this.getMethodReturnType());
+        // whitespace followed by parts
+        String builder = Arrays.stream(parts).map(part -> part + " ")
+                .collect(Collectors.joining("", this.getFirstSmaliLine().getWhitespace(), ""));
 
-        // 2. make a new method start line
-        SmaliLine newFirstLine = new SmaliLine(builder.toString(), this.getParentFile());
-        this.getFirstSmaliLine().getPrevSmaliLine().insertAfter(newFirstLine);
-        // TODO: update this like smaliField
-        // this.getFirstSmaliLine().delete();
-        this.setFirstSmaliLine(newFirstLine);
+        this.getParentSmaliFile().getMethodNameChange().put(oldMethodID, newMethodID);
 
-        this.getParentFile().getMethodNameChange().put(oldMethodID, newMethodID);
-
-        // 3. unlink method name from parent file
-        HashMap<String, SmaliMethod> map = this.getParentFile().getMethodMap();
-        map.put(newMethodID, map.remove(oldMethodID));
+        String last = parts[parts.length - 1];
+        this.identifier = last.substring(0, last.lastIndexOf(")") + 1); // onCreate()
+        this.methodName = last.substring(0, last.indexOf("(")); // onCreate
+        // rename method start line
+        this.getFirstSmaliLine().setText(builder.stripTrailing());
 
         relinkAfterRename(oldMethodID, newMethodID);
     }
 
     // re-link all the lines pointing to this method
     private void relinkAfterRename(String oldMethodID, String newMethodID) {
-        HashMap<String, ArrayList<SmaliLine>> references = this.getParentFile().getMethodReferences();
-        for (SmaliFile childFile : this.getParentFile().getChildFileMap().values()) {
+        HashMap<String, ArrayList<SmaliLine>> references = this.getParentSmaliFile().getMethodReferences();
+        for (SmaliFile childFile : this.getParentSmaliFile().getChildFileMap().values()) {
             if(!childFile.getMethodMap().containsKey(oldMethodID) && childFile.getMethodReferences().containsKey(oldMethodID)) {
                 // child has references to this method, but doesn't contain the method!
                 if(!references.containsKey(oldMethodID)) {
@@ -147,19 +140,22 @@ public class SmaliMethod implements SmaliBlock {
         }
 
         if (references.containsKey(oldMethodID)) {
-            for (SmaliLine smaliLine : new ArrayList<>(references.get(oldMethodID))) {
+            ArrayList<SmaliLine> copyOfReferences = new ArrayList<>(references.get(oldMethodID));
+            for (SmaliLine smaliLine : copyOfReferences) {
                 String replaceThis = "->" + oldMethodID + methodReturnType;
                 String newText = "->" + newMethodID + methodReturnType;
                 String text = smaliLine.getText();
                 smaliLine.setText(text.replace(replaceThis, newText));
+            }
+
+            for (SmaliLine smaliLine : copyOfReferences) {
+                smaliLine.getParentSmaliFile().getMethodReferences().remove(oldMethodID);
             }
         }
     }
 
     public void setLastLine(SmaliLine lastSmaliLine) {
         this.lastSmaliLine = lastSmaliLine;
-        this.ended = true;
-
         updateChildSmaliLines();
 
     }
@@ -209,7 +205,7 @@ public class SmaliMethod implements SmaliBlock {
     }
 
     public boolean isAbstract() {
-        return this.getFirstSmaliLine().getPartsSet().contains("abstract") && this.getParentFile().isAbstract();
+        return this.getFirstSmaliLine().getPartsSet().contains("abstract") && this.getParentSmaliFile().isAbstract();
     }
 
     public boolean canRename() {
@@ -230,10 +226,6 @@ public class SmaliMethod implements SmaliBlock {
         return methodReturnType;
     }
 
-    public boolean isEnded() {
-        return ended;
-    }
-
     @Override
     public String getIdentifier() {
         return identifier;
@@ -242,7 +234,6 @@ public class SmaliMethod implements SmaliBlock {
     @Override
     public String toString() {
         return "SmaliMethod{" +
-                "ended=" + ended +
                 ", parentFile=" + parentFile +
                 ", firstSmaliLine=" + firstSmaliLine +
                 ", lastSmaliLine=" + lastSmaliLine +

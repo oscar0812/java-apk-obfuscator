@@ -164,21 +164,29 @@ public class SmaliFile extends File {
 
     public void addFieldLine(SmaliLine smaliLine) {
         SmaliField sf = null;
-        if(smaliLine.getOldText() !=null) {
-            // get substring between : and first space previous to :
-            int indexOfColon = smaliLine.getOldText().indexOf(":");
-            int indexOfSpace = smaliLine.getOldText().substring(0, indexOfColon).lastIndexOf(" ");
-            String identifier = smaliLine.getOldText().substring(indexOfSpace + 1, indexOfColon);
+        if (smaliLine.getOldParts() != null) {
+            String[] parts = smaliLine.getOldParts();
+            // get array index that contains :
+            int indexOfField = -1;
+            for (int x = 0; x < parts.length; x++) {
+                if (parts[x].contains(":")) {
+                    indexOfField = x;
+                    break;
+                }
+            }
+            assert indexOfField >= 0;
 
 
-            if(fieldMap.containsKey(identifier)) {
+            String identifier = parts[indexOfField].substring(0, parts[indexOfField].indexOf(":"));
+
+            if (fieldMap.containsKey(identifier)) {
                 // updating, not adding new
                 sf = fieldMap.get(identifier);
                 fieldMap.remove(identifier);
             }
         }
 
-        if (sf == null){
+        if (sf == null) {
             // new
             sf = new SmaliField(smaliLine);
             fieldList.add(sf);
@@ -191,23 +199,37 @@ public class SmaliFile extends File {
         String[] parts = smaliLine.getParts();
         if (parts[0].equals(".method")) {
             // start of a method
-            SmaliMethod sm = new SmaliMethod(this, smaliLine);
-            if (lastDescriptiveComment != null) {
-                String text = lastDescriptiveComment.getText();
-                sm.setMethodType(text.contains("virtual") ? "virtual" : text.contains("direct") ? "direct" : "");
+            SmaliMethod sm = null;
+            // relink method if rename
+            if(smaliLine.getOldParts() != null && smaliLine.getOldParts()[0].equals(".method")) {
+                String last = smaliLine.getOldParts()[smaliLine.getOldParts().length - 1];
+                String identifier = last.substring(0, last.lastIndexOf(")") + 1);
+                if(methodMap.containsKey(identifier)) {
+                    // contains old link, remove it
+                    sm = methodMap.get(identifier);
+                    methodMap.remove(identifier);
+                }
             }
-            methodList.add(sm);
+
+            if(sm == null) {
+                sm = new SmaliMethod(this, smaliLine);
+                if (lastDescriptiveComment != null) {
+                    String text = lastDescriptiveComment.getText();
+                    sm.setMethodType(text.contains("virtual") ? "virtual" : text.contains("direct") ? "direct" : "");
+                }
+                methodList.add(sm);
+            }
 
             // update the hashmap, to search for method faster by name
             String id = sm.getIdentifier();
             methodMap.put(id.substring(0, id.indexOf(")") + 1), sm);
-        } else if (methodList.size() > 0 && !methodList.get(methodList.size() - 1).isEnded()) {
-            // this line is part of a method
-            if (parts[0].equals(".end") && parts[1].equals("method")) {
-                SmaliMethod sm = methodList.get(methodList.size() - 1);
-                smaliLine.setParentMethod(sm);
-                sm.setLastLine(smaliLine);
-            }
+        } else if (parts[0].equals(".end") && parts[1].equals("method")) {
+            // this line is the end of a method
+            SmaliMethod sm = methodList.get(methodList.size() - 1);
+            smaliLine.setParentMethod(sm);
+            sm.setLastLine(smaliLine);
+            // loop from start to finish setting the parentMethod var
+            sm.updateChildSmaliLines();
         }
     }
 
@@ -271,7 +293,7 @@ public class SmaliFile extends File {
         oldSmaliPackageToNew.put(this.getSmaliPackage(), renameFileTo.getSmaliPackage());
 
         // rename references in XML
-        if(this.getFirstWordSmaliLineMap().containsKey(".source")) {
+        if (this.getFirstWordSmaliLineMap().containsKey(".source")) {
             // some classes (like Lcom/google/android/gms/cast/VideoInfo; dont have .source)
             SmaliLine source = this.getFirstWordSmaliLineMap().get(".source").get(0);
             source.setText(".source \"WHY_ARE_YOU_HERE.java\"");
@@ -283,7 +305,7 @@ public class SmaliFile extends File {
         File parentDir = inFile.getParentFile();
         HashMap<String, File> oldToNewSmaliDirMap = APKInfo.getInstance().getOldToNewSmaliDirMap();
 
-        if(oldToNewSmaliDirMap.containsKey(parentDir.getAbsolutePath())) {
+        if (oldToNewSmaliDirMap.containsKey(parentDir.getAbsolutePath())) {
             return oldToNewSmaliDirMap.get(parentDir.getAbsolutePath());
         }
 

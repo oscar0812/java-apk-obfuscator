@@ -48,7 +48,7 @@ public class SmaliField implements SmaliBlock {
     }
 
     @Override
-    public SmaliFile getParentFile() {
+    public SmaliFile getParentSmaliFile() {
         return this.getSmaliLine().getParentSmaliFile();
     }
 
@@ -60,7 +60,7 @@ public class SmaliField implements SmaliBlock {
     @Override
     public HashMap<String, String> parentNameChanges() {
         HashMap<String, String> changes = new HashMap<>();
-        for (SmaliFile parentFile : this.getParentFile().getParentFileMap().values()) {
+        for (SmaliFile parentFile : this.getParentSmaliFile().getParentFileMap().values()) {
             changes.putAll(parentFile.getFieldNameChange());
         }
         return changes;

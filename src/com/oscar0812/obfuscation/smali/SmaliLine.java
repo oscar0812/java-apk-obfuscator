@@ -28,8 +28,7 @@ public class SmaliLine {
     public static final String DOUBLE_SPACE = "        ";
     public static final String TRIPLE_SPACE = "            ";
 
-
-    private String oldText = null;
+    private String[] oldParts = null;
     private String text = null;
     private String whitespace; // how much whitespace is at the beg of text
 
@@ -54,8 +53,10 @@ public class SmaliLine {
     }
 
     public void setText(String text) {
-        if(this.text != null) {
-            oldText = this.getText();
+        if (this.text != null) {
+            // renaming (not new)
+            oldParts = this.getParts();
+            // removeSmaliLinks();
         }
         this.text = text;
         this.whitespace = StringUtils.getLeadingWhitespace(text);
@@ -74,8 +75,8 @@ public class SmaliLine {
             partList.add(trimmed.substring(firstQ + 1, lastQ));
         } else {
             // nothing special? IDK, just split by spaces
-            for(String part: trimmed.split("\\s+")) {
-                if(part.equals("#") && partList.size() > 0) {
+            for (String part : trimmed.split("\\s+")) {
+                if (part.equals("#") && partList.size() > 0) {
                     // ignore trailing comments
                     break;
                 }
@@ -168,10 +169,6 @@ public class SmaliLine {
         return builder.toString();
     }
 
-    public String getOldText() {
-        return oldText;
-    }
-
     public String getWhitespace() {
         return whitespace;
     }
@@ -249,8 +246,14 @@ public class SmaliLine {
         return prevSmaliLine;
     }
 
-    public boolean isGarbage() {
-        return isGarbage;
+    public void delete() {
+        // remove it from linked list
+        if (this.prevSmaliLine != null) {
+            this.prevSmaliLine.nextSmaliLine = this.nextSmaliLine;
+        }
+        if (this.nextSmaliLine != null) {
+            this.nextSmaliLine.prevSmaliLine = this.prevSmaliLine;
+        }
     }
 
     @Override
@@ -274,5 +277,9 @@ public class SmaliLine {
                 ", parts=" + Arrays.toString(parts) +
                 ", parentFile=" + parentSmaliFile +
                 '}';
+    }
+
+    public String[] getOldParts() {
+        return oldParts;
     }
 }

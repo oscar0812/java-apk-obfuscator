@@ -13,7 +13,7 @@ public interface SmaliBlock {
 
     Set<String> getMapKeys(SmaliFile smaliFile);
 
-    SmaliFile getParentFile();
+    SmaliFile getParentSmaliFile();
 
     default String appendAfterName() {
         return "";
@@ -22,8 +22,8 @@ public interface SmaliBlock {
     HashMap<String, String> parentNameChanges();
 
     default Set<String> getTakenIDs() {
-        Set<String> takenIDs = new HashSet<>(getMapKeys(this.getParentFile()));
-        for (SmaliFile parentSmaliFile : this.getParentFile().getParentFileMap().values()) {
+        Set<String> takenIDs = new HashSet<>(getMapKeys(this.getParentSmaliFile()));
+        for (SmaliFile parentSmaliFile : this.getParentSmaliFile().getParentFileMap().values()) {
             takenIDs.addAll(getMapKeys(parentSmaliFile));
         }
         return takenIDs;

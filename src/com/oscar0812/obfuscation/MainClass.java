@@ -149,10 +149,8 @@ public class MainClass {
                 continue;
             }
 
-            if (smaliLine.getParentMethod() != null && !smaliLine.isGarbage()) {
-                if (!smaliLine.getParentMethod().isConstructor()) {
-                    SmaliLineObfuscator.getInstance().stringToStaticCall(smaliLine);
-                }
+            if (smaliLine.getParentMethod() != null && !smaliLine.getParentMethod().isConstructor()) {
+                SmaliLineObfuscator.getInstance().stringToStaticCall(smaliLine);
             }
         }
     }
@@ -168,12 +166,9 @@ public class MainClass {
 
         // obfuscate const integers/longs
         for (SmaliLine smaliLine : smaliLines) {
-            if (smaliLine.getParentMethod() != null && !smaliLine.isGarbage()) {
-                if (!smaliLine.getParentMethod().isConstructor()) {
-                    // dont obfuscate constructor const's (for now)
-
-                    SmaliLineObfuscator.getInstance().obfuscateConstInt(smaliLine);
-                }
+            if (smaliLine.getParentMethod() != null && !smaliLine.getParentMethod().isConstructor()) {
+                // dont obfuscate constructor const's (for now)
+                SmaliLineObfuscator.getInstance().obfuscateConstInt(smaliLine);
             }
         }
     }
@@ -198,7 +193,7 @@ public class MainClass {
         for (String is : ignoreStart) {
             if (smaliLineMap.containsKey(is)) {
                 for (SmaliLine sl : smaliLineMap.get(is)) {
-                    // sl.delete();
+                    sl.delete();
                 }
             }
         }
@@ -371,7 +366,7 @@ public class MainClass {
     }
 
     private void start() {
-        APKInfo.setAPKPath("C:\\Users\\oscar\\IdeaProjects\\APKobfuscation\\apks\\sample_navigation.apk");
+        APKInfo.setAPKPath("C:\\Users\\oscar\\IdeaProjects\\APKobfuscation\\apks\\timber.apk");
         APKInfo info = APKInfo.getInstance();
         File apkFile = info.getApkFile();
         File apkParentDir = info.getApkParentDir();
