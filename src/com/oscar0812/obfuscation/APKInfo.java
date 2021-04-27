@@ -32,7 +32,6 @@ public class APKInfo {
     private final ArrayList<File> manifestAppFileList = new ArrayList<>();
 
     // keep track of the smali directories inside smali/
-    private final ArrayList<File> projectFirstChildDirs = new ArrayList<>();
     private final HashMap<String, File> oldToNewSmaliDirMap = new HashMap<>();
 
     private String manifestPackageStr;
@@ -228,6 +227,14 @@ public class APKInfo {
         return null;
     }
 
+    static void ensureFoldersExist(File folder) {
+        if (!folder.exists()) {
+            if (!folder.mkdirs()) {
+                ensureFoldersExist(folder.getParentFile());
+            }
+        }
+    }
+
     private void fetchProjectSmaliFiles() {
         mainProjectDir = fetchProjectMainDir();
         assert mainProjectDir != null;
@@ -252,21 +259,19 @@ public class APKInfo {
                     }
                 } else if (file.isDirectory()) {
                     // found directory
-                    if (file.getParentFile().getAbsolutePath().equals(mainProjectDir.getAbsolutePath())) {
-                        projectFirstChildDirs.add(file);
-                    }
 
+                    File newParent = parent;
                     // to rename packages we will first create the directories and set a link between the old
                     // dir and the new one
                     if (oldToNewSmaliDirMap.containsKey(file.getParentFile().getAbsolutePath())) {
                         // contains the parent
-                        parent = oldToNewSmaliDirMap.get(file.getParentFile().getAbsolutePath());
+                        newParent = oldToNewSmaliDirMap.get(file.getParentFile().getAbsolutePath());
                     }
 
                     for (String perm : StringUtils.getStringPermutations()) {
-                        File newDir = new File(parent, perm);
+                        File newDir = new File(newParent, perm);
                         if (!newDir.exists()) {
-                            newDir.mkdir();
+                            ensureFoldersExist(newDir);
                             oldToNewSmaliDirMap.put(file.getAbsolutePath(), newDir);
                             break;
                         }
@@ -299,10 +304,6 @@ public class APKInfo {
 
     public HashMap<String, String> getOldSmaliPackageToNew() {
         return oldSmaliPackageToNew;
-    }
-
-    public ArrayList<File> getProjectFirstChildDirs() {
-        return projectFirstChildDirs;
     }
 
     public HashMap<String, File> getOldToNewSmaliDirMap() {

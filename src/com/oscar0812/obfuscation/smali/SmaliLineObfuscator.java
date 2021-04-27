@@ -38,7 +38,7 @@ public class SmaliLineObfuscator {
         // create a file with a name that doesn't exist in the same directory as siblingFile
         File parent = SmaliFile.getCreatedSmaliDir(siblingFile);
 
-        if(!dirFiles.containsKey(parent.getAbsolutePath())) {
+        if (!dirFiles.containsKey(parent.getAbsolutePath())) {
             dirFiles.put(parent.getAbsolutePath(), smaliFilesInDir(parent));
         }
         Set<String> filePaths = dirFiles.get(parent.getAbsolutePath());
@@ -135,9 +135,9 @@ public class SmaliLineObfuscator {
 
         obfFile.appendString(// SmaliLine.SINGLE_SPACE + ".line " + obfFile.debugLine + "\n" +
                 SmaliLine.SINGLE_SPACE + "new-instance v2, Ljava/lang/String;\n\n" +
-                SmaliLine.SINGLE_SPACE + "invoke-direct {v2, v0}, Ljava/lang/String;-><init>([B)V\n\n" +
-                SmaliLine.SINGLE_SPACE + "return-object v2\n" +
-                ".end method");
+                        SmaliLine.SINGLE_SPACE + "invoke-direct {v2, v0}, Ljava/lang/String;-><init>([B)V\n\n" +
+                        SmaliLine.SINGLE_SPACE + "return-object v2\n" +
+                        ".end method");
 
         // obfFile.debugLine += 10;
     }
@@ -146,7 +146,7 @@ public class SmaliLineObfuscator {
     // invoke-static {}, Lcom/oscar0812/sample_navigation/StringUtil;->a()Ljava/lang/String;
     //
     // move-result-object v0
-    public SmaliLine stringToStaticCall(SmaliLine inLine) {
+    public void stringToStaticCall(SmaliLine inLine) {
         String register = inLine.getParts()[1].replace(",", ""); // v0, => v0
 
         int randomNum = ThreadLocalRandom.current().nextInt(0, obfFilePaths.size() + 2);
@@ -170,9 +170,46 @@ public class SmaliLineObfuscator {
 
         // add this to the apk (IT IS PART OF IT NOW!)
         APKInfo.getInstance().addSmaliFile(obfFile);
-        SmaliLine smaliLine = new SmaliLine(SmaliLine.SINGLE_SPACE + "invoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;", inLine.getParentSmaliFile());
-        smaliLine.insertAfter("").insertAfter(SmaliLine.SINGLE_SPACE + "move-result-object " + register);
+        inLine.setText(SmaliLine.SINGLE_SPACE + "invoke-static {}, " + obfFile.getSmaliPackage() + "->" + methodName + "()Ljava/lang/String;");
+        inLine.insertAfter("").insertAfter(SmaliLine.SINGLE_SPACE + "move-result-object " + register);
+    }
 
-        return smaliLine;
+    public void obfuscateConstInt(SmaliLine inLine) {
+        String[] parts = inLine.getParts();
+        // const v3, 0x7f060061
+        // 0x7f060061
+
+        String hex = parts[parts.length - 1];
+        boolean negHex = hex.startsWith("-0x");
+        // 7f060061
+        hex = hex.substring(hex.indexOf("x") + 1);
+        int dec = Integer.parseInt(hex, 16);
+
+        int randomInt = ThreadLocalRandom.current().nextInt(1, 11); // 11 so it can include 10 (0, 10)
+
+        // v0,
+        String register = parts[parts.length - 2];
+        // v0
+        register = register.substring(0, register.length() - 1);
+
+        // to keep it in bounds (nothing fancy)
+        if (negHex) {
+            // neg.
+            int javaMin32Bit = -2147483648;
+            int t = javaMin32Bit + dec;
+            if (t >= - -11) {
+                return;
+            }
+
+            dec += randomInt;
+        } else {
+            dec -= randomInt;
+        }
+        // add it back in the next line
+        String nextLineNewSmaliText = inLine.getWhitespace() + "add-int/lit8 " + register + ", " + register + ", 0x" + Integer.toHexString(randomInt);
+
+        String newSmaliText = inLine.getText().replace("0x" + hex, "0x" + Integer.toHexString(Math.abs(dec)));
+        inLine.setText(newSmaliText);
+        inLine.insertAfter("").insertAfter(nextLineNewSmaliText);
     }
 }

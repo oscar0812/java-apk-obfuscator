@@ -120,7 +120,8 @@ public class SmaliMethod implements SmaliBlock {
         // 2. make a new method start line
         SmaliLine newFirstLine = new SmaliLine(builder.toString(), this.getParentFile());
         this.getFirstSmaliLine().getPrevSmaliLine().insertAfter(newFirstLine);
-        this.getFirstSmaliLine().delete();
+        // TODO: update this like smaliField
+        // this.getFirstSmaliLine().delete();
         this.setFirstSmaliLine(newFirstLine);
 
         this.getParentFile().getMethodNameChange().put(oldMethodID, newMethodID);

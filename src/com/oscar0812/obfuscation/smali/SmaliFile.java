@@ -163,8 +163,27 @@ public class SmaliFile extends File {
     }
 
     public void addFieldLine(SmaliLine smaliLine) {
-        SmaliField sf = new SmaliField(smaliLine);
-        fieldList.add(sf);
+        SmaliField sf = null;
+        if(smaliLine.getOldText() !=null) {
+            // get substring between : and first space previous to :
+            int indexOfColon = smaliLine.getOldText().indexOf(":");
+            int indexOfSpace = smaliLine.getOldText().substring(0, indexOfColon).lastIndexOf(" ");
+            String identifier = smaliLine.getOldText().substring(indexOfSpace + 1, indexOfColon);
+
+
+            if(fieldMap.containsKey(identifier)) {
+                // updating, not adding new
+                sf = fieldMap.get(identifier);
+                fieldMap.remove(identifier);
+            }
+        }
+
+        if (sf == null){
+            // new
+            sf = new SmaliField(smaliLine);
+            fieldList.add(sf);
+        }
+
         fieldMap.put(sf.getIdentifier(), sf);
     }
 
@@ -252,8 +271,11 @@ public class SmaliFile extends File {
         oldSmaliPackageToNew.put(this.getSmaliPackage(), renameFileTo.getSmaliPackage());
 
         // rename references in XML
-        SmaliLine source = this.getFirstWordSmaliLineMap().get(".source").get(0);
-        source.setText(".source \"WHY_ARE_YOU_HERE.java\"");
+        if(this.getFirstWordSmaliLineMap().containsKey(".source")) {
+            // some classes (like Lcom/google/android/gms/cast/VideoInfo; dont have .source)
+            SmaliLine source = this.getFirstWordSmaliLineMap().get(".source").get(0);
+            source.setText(".source \"WHY_ARE_YOU_HERE.java\"");
+        }
     }
 
     // return the new name for the parent dir (package rename)

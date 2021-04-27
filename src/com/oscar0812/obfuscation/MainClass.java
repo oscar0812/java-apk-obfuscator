@@ -27,6 +27,9 @@ import java.util.concurrent.ThreadLocalRandom;
  *          63543 is the port in adb settings (gear icon -> preferences -> scroll down)
  *
  *   use jadx.exe to look at apk .dex source code
+ *
+ *   papers:
+ *      https://arxiv.org/pdf/1809.11037.pdf
  * */
 
 
@@ -148,10 +151,7 @@ public class MainClass {
 
             if (smaliLine.getParentMethod() != null && !smaliLine.isGarbage()) {
                 if (!smaliLine.getParentMethod().isConstructor()) {
-                    // dont obfuscate constructor string (for now)
-                    SmaliLine obfCall = SmaliLineObfuscator.getInstance().stringToStaticCall(smaliLine);
-                    smaliLine.getPrevSmaliLine().insertAfter(obfCall);
-                    smaliLine.delete();
+                    SmaliLineObfuscator.getInstance().stringToStaticCall(smaliLine);
                 }
             }
         }
@@ -172,43 +172,7 @@ public class MainClass {
                 if (!smaliLine.getParentMethod().isConstructor()) {
                     // dont obfuscate constructor const's (for now)
 
-                    String[] parts = smaliLine.getParts();
-                    // const v3, 0x7f060061
-                    // 0x7f060061
-
-                    String hex = parts[parts.length - 1];
-                    boolean negHex = hex.startsWith("-0x");
-                    // 7f060061
-                    hex = hex.substring(hex.indexOf("x") + 1);
-                    int dec = Integer.parseInt(hex, 16);
-
-                    int randomInt = ThreadLocalRandom.current().nextInt(1, 11); // 11 so it can include 10 (0, 10)
-
-                    // v0,
-                    String register = parts[parts.length - 2];
-                    // v0
-                    register = register.substring(0, register.length() - 1);
-
-                    String nextLineNewSmaliText = smaliLine.getWhitespace();
-                    // to keep it in bounds (nothing fancy)
-                    if (negHex) {
-                        // neg.
-                        int javaMin32Bit = -2147483648;
-                        int t = javaMin32Bit + dec;
-                        if(t >=- -11) {
-                            continue; // will overflow, so skip
-                        }
-
-                        dec += randomInt;
-                    } else {
-                        dec -= randomInt;
-                    }
-                    String newSmaliText = smaliLine.getText().replace("0x" + hex, "0x" + Integer.toHexString(Math.abs(dec)));
-                    // add it back in the next line
-                    nextLineNewSmaliText += "add-int/lit8 " + register + ", " + register + ", 0x" + Integer.toHexString(randomInt);
-
-                    smaliLine.setText(newSmaliText);
-                    smaliLine.insertAfter("").insertAfter(nextLineNewSmaliText);
+                    SmaliLineObfuscator.getInstance().obfuscateConstInt(smaliLine);
                 }
             }
         }
@@ -234,7 +198,7 @@ public class MainClass {
         for (String is : ignoreStart) {
             if (smaliLineMap.containsKey(is)) {
                 for (SmaliLine sl : smaliLineMap.get(is)) {
-                    sl.delete();
+                    // sl.delete();
                 }
             }
         }
@@ -317,37 +281,39 @@ public class MainClass {
                 System.out.println("COULDN'T DELETE:: " + smaliFile.getAbsolutePath());
             }
         }
+    }
 
+    public void deleteEmptyDirs() {
         // delete empty directories
-        for (File file : APKInfo.getInstance().getProjectFirstChildDirs()) {
-            Queue<File> q = new LinkedList<>();
-            q.add(file);
+        Queue<File> q = new LinkedList<>();
+        q.add(APKInfo.getInstance().getSmaliDir());
 
-            Stack<File> allDirs = new Stack<>();
+        Stack<File> allDirs = new Stack<>();
 
-            while (!q.isEmpty()) {
-                File qDir = q.poll();
-                allDirs.add(qDir);
+        while (!q.isEmpty()) {
+            File qDir = q.poll();
+            allDirs.push(qDir);
 
-                File[] listFiles = qDir.listFiles();
+            File[] listFiles = qDir.listFiles();
 
-                if (listFiles == null || listFiles.length == 0) {
-                    continue;
-                }
-
-                for (File f : listFiles) {
-                    if (f.isDirectory()) {
-                        q.add(f);
-                    } else {
-                        // WE SHOULDN'T DELETE FOLDERS THAT ARE NOT EMPTY
-                        return;
-                    }
-                }
+            if (listFiles == null || listFiles.length == 0) {
+                continue;
             }
 
-            // a stack will keep the deepest folders at the top
-            while (!allDirs.empty()) {
-                allDirs.pop().delete();
+            for (File f : listFiles) {
+                if (f.isDirectory()) {
+                    q.add(f);
+                }
+            }
+        }
+
+        // a stack will keep the deepest folders at the top
+        while (!allDirs.empty()) {
+            File dir = allDirs.pop();
+            File[] listFiles = dir.listFiles();
+
+            if (listFiles == null || listFiles.length == 0) {
+                dir.delete();
             }
         }
     }
@@ -380,7 +346,7 @@ public class MainClass {
 
             obfuscateMethods(smaliFile);
             obfuscateFields(smaliFile);
-            deleteDebugLines(smaliFile);
+            // deleteDebugLines(smaliFile);
 
             // other...
         }
@@ -392,7 +358,6 @@ public class MainClass {
         }
 
         renameSmaliClassFiles();
-
         obfuscateRSmaliAndXML();
         renameDrawables();
 
@@ -401,10 +366,12 @@ public class MainClass {
             SmaliFile smaliFile = APKInfo.getInstance().getAllSmaliFileMap().get(path);
             smaliFile.saveToDisk(path);
         }
+
+        deleteEmptyDirs();
     }
 
     private void start() {
-        APKInfo.setAPKPath("C:\\Users\\oscar\\IdeaProjects\\APKobfuscation\\apks\\timber.apk");
+        APKInfo.setAPKPath("C:\\Users\\oscar\\IdeaProjects\\APKobfuscation\\apks\\sample_navigation.apk");
         APKInfo info = APKInfo.getInstance();
         File apkFile = info.getApkFile();
         File apkParentDir = info.getApkParentDir();

@@ -7,7 +7,7 @@ import com.oscar0812.obfuscation.utils.Substring;
 import java.io.File;
 import java.util.*;
 
-/**
+/*
  * const/4 is for 0-7 (fit in 8 bits)
  * const/16 is for 8-127 (fit in 16 bits)
  * const is for arbitrary 32-bit
@@ -28,7 +28,9 @@ public class SmaliLine {
     public static final String DOUBLE_SPACE = "        ";
     public static final String TRIPLE_SPACE = "            ";
 
-    private String text;
+
+    private String oldText = null;
+    private String text = null;
     private String whitespace; // how much whitespace is at the beg of text
 
     private String[] parts;
@@ -43,12 +45,18 @@ public class SmaliLine {
 
     private boolean isGarbage = false;
 
+    // to identify in equals() method
+    UUID identification = UUID.randomUUID();
+
     public SmaliLine(String text, SmaliFile parentSmaliFile) {
         this.parentSmaliFile = parentSmaliFile;
         setText(text);
     }
 
     public void setText(String text) {
+        if(this.text != null) {
+            oldText = this.getText();
+        }
         this.text = text;
         this.whitespace = StringUtils.getLeadingWhitespace(text);
 
@@ -80,15 +88,12 @@ public class SmaliLine {
         partsSet.clear();
         Collections.addAll(partsSet, parts);
 
-        this.referenceSmaliFileList.clear();
-        this.referenceSmaliFileMap.clear();
-
         process();
     }
 
     // check if this line connects/refers to other lines, and if its a special line (method, field, etc)
     private void process() {
-        // check if lines reference any class
+        // check if this line references any class(es)
         HashMap<String, SmaliFile> smaliFileMap = APKInfo.getInstance().getAllSmaliFileMap();
 
         File smaliDir = APKInfo.getInstance().getSmaliDir();
@@ -161,6 +166,10 @@ public class SmaliLine {
             }
         }
         return builder.toString();
+    }
+
+    public String getOldText() {
+        return oldText;
     }
 
     public String getWhitespace() {
@@ -240,19 +249,22 @@ public class SmaliLine {
         return prevSmaliLine;
     }
 
-    public void delete() {
-        // remove it from linked list
-        if (this.prevSmaliLine != null) {
-            this.prevSmaliLine.nextSmaliLine = this.nextSmaliLine;
-        }
-        if (this.nextSmaliLine != null) {
-            this.nextSmaliLine.prevSmaliLine = this.prevSmaliLine;
-        }
-        isGarbage = true;
-    }
-
     public boolean isGarbage() {
         return isGarbage;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        // equals checks special id and parent for equality
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        SmaliLine smaliLine = (SmaliLine) o;
+        return Objects.equals(parentSmaliFile.getAbsolutePath(), smaliLine.parentSmaliFile.getAbsolutePath()) && Objects.equals(identification, smaliLine.identification);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(parentSmaliFile, identification);
     }
 
     @Override

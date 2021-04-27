@@ -2,9 +2,7 @@ package com.oscar0812.obfuscation.smali;
 
 import com.oscar0812.obfuscation.APKInfo;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Set;
+import java.util.*;
 
 /***
  #static fields
@@ -81,41 +79,27 @@ public class SmaliField implements SmaliBlock {
     }
 
     public void rename(String newFieldName) {
-        // 1. get new field name
-        String[] parts = this.getSmaliLine().getParts();
-        StringBuilder builder = new StringBuilder(this.getSmaliLine().getWhitespace());
+        // get a new field name
+        String[] parts = this.getSmaliLine().getParts().clone();
 
-        for (int x = 0; x < this.getIndexOfField(); x++) {
-            builder.append(parts[x]);
+        // mAppBarConfiguration:Landroidx/navigation/ui/AppBarConfiguration; -> a:Landroidx/navigation/ui/AppBarConfiguration;
+        parts[indexOfField] = newFieldName + ":" + this.fieldType;
+
+        StringBuilder builder = new StringBuilder(this.getSmaliLine().getWhitespace());
+        Arrays.stream(parts).forEach(part -> {
+            builder.append(part);
             builder.append(" ");
-        }
+        });
 
         String oldFieldName = this.getIdentifier();
 
-        builder.append(newFieldName).append(":").append(this.getFieldType());
-
-        if (getIndexOfField() + 1 < parts.length) {
-            builder.append(" ");
-        }
-
-        for (int x = getIndexOfField() + 1; x < parts.length; x++) {
-            builder.append(parts[x]);
-            builder.append(" ");
-        }
-
         this.getSmaliLine().getParentSmaliFile().getFieldNameChange().put(oldFieldName, newFieldName);
 
-        // 2. make a new field line
-        SmaliLine newFieldLine = new SmaliLine(builder.toString().stripTrailing(), this.getSmaliLine().getParentSmaliFile());
-        this.getSmaliLine().getPrevSmaliLine().insertAfter(newFieldLine);
-        this.getSmaliLine().delete();
-        this.setSmaliLine(newFieldLine);
+        // rename field line
+        this.getSmaliLine().setText(builder.toString().stripTrailing());
+        this.setSmaliLine(this.getSmaliLine()); // update the variables
 
-        // 3. unlink method name from parent file
-        HashMap<String, SmaliField> map = this.getSmaliLine().getParentSmaliFile().getFieldMap();
-        map.put(newFieldName, map.remove(oldFieldName));
-
-        // 4. change all lines that called this method by the old name
+        // change all lines that called this method by the old name
         ArrayList<SmaliLine> smaliLinesPointingToThisField = this.getSmaliLine().getParentSmaliFile().getFieldReferences().get(oldFieldName);
 
         if (smaliLinesPointingToThisField == null) {
@@ -135,6 +119,10 @@ public class SmaliField implements SmaliBlock {
             String text = smaliLine.getText();
             smaliLine.setText(text.replace(replaceThis, newText));
         }
+
+        // move all references to the new key
+        HashMap<String, ArrayList<SmaliLine>> referenceMap = this.getSmaliLine().getParentSmaliFile().getFieldReferences();
+        referenceMap.put(newFieldName, referenceMap.remove(oldFieldName));
     }
 
     public boolean canRename() {
@@ -165,5 +153,18 @@ public class SmaliField implements SmaliBlock {
 
     public String getValue() {
         return value;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        SmaliField that = (SmaliField) o;
+        return Objects.equals(smaliLine, that.smaliLine);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(smaliLine);
     }
 }
