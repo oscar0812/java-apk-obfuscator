@@ -3,6 +3,7 @@ package com.oscar0812.obfuscation.smali;
 import com.oscar0812.obfuscation.APKInfo;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /***
  #static fields
@@ -85,19 +86,17 @@ public class SmaliField implements SmaliBlock {
         // mAppBarConfiguration:Landroidx/navigation/ui/AppBarConfiguration; -> a:Landroidx/navigation/ui/AppBarConfiguration;
         parts[indexOfField] = newFieldName + ":" + this.fieldType;
 
-        StringBuilder builder = new StringBuilder(this.getSmaliLine().getWhitespace());
-        Arrays.stream(parts).forEach(part -> {
-            builder.append(part);
-            builder.append(" ");
-        });
+        // whitespace followed by parts joined by space
+        String builder = Arrays.stream(parts).map(part -> part + " ")
+                .collect(Collectors.joining("", this.getSmaliLine().getWhitespace(), ""));
 
         String oldFieldName = this.getIdentifier();
 
         this.getSmaliLine().getParentSmaliFile().getFieldNameChange().put(oldFieldName, newFieldName);
 
         // rename field line
-        this.getSmaliLine().setText(builder.toString().stripTrailing());
-        this.setSmaliLine(this.getSmaliLine()); // update the variables
+        this.getSmaliLine().setText(builder.stripTrailing());
+        this.setIdentifier(newFieldName); // update the identifier
 
         // change all lines that called this method by the old name
         ArrayList<SmaliLine> smaliLinesPointingToThisField = this.getSmaliLine().getParentSmaliFile().getFieldReferences().get(oldFieldName);
@@ -122,7 +121,7 @@ public class SmaliField implements SmaliBlock {
 
         // move all references to the new key
         HashMap<String, ArrayList<SmaliLine>> referenceMap = this.getSmaliLine().getParentSmaliFile().getFieldReferences();
-        referenceMap.put(newFieldName, referenceMap.remove(oldFieldName));
+        referenceMap.remove(oldFieldName);
     }
 
     public boolean canRename() {
@@ -145,6 +144,10 @@ public class SmaliField implements SmaliBlock {
     @Override
     public String getIdentifier() {
         return identifier;
+    }
+
+    private void setIdentifier(String identifier) {
+        this.identifier = identifier;
     }
 
     public String getFieldType() {
