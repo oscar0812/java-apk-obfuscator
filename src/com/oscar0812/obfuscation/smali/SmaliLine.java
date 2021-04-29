@@ -42,8 +42,6 @@ public class SmaliLine {
     private final ArrayList<SmaliFile> referenceSmaliFileList = new ArrayList<>();
     private final HashMap<String, SmaliFile> referenceSmaliFileMap = new HashMap<>();
 
-    private boolean isGarbage = false;
-
     // to identify in equals() method
     UUID identification = UUID.randomUUID();
 

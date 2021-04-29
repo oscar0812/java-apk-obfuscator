@@ -1,11 +1,9 @@
 package com.oscar0812.obfuscation.smali;
 
-import com.oscar0812.obfuscation.utils.StringUtils;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class SmaliMethod implements SmaliBlock {
+public class SmaliMethod implements SmaliBlock{
     private final SmaliFile parentFile;
 
     private SmaliLine firstSmaliLine; // .method ...
@@ -16,7 +14,7 @@ public class SmaliMethod implements SmaliBlock {
     private String[] methodParameterArr; // how to hold parameters? just like this for now
     private String methodReturnType;
 
-    // onCreate(Landroid/os/Bundle;)V
+    // onCreate(Landroid/os/Bundle;)
     private String identifier = null;
 
     String methodType = "direct"; // direct or virtual or idk what else
@@ -59,44 +57,23 @@ public class SmaliMethod implements SmaliBlock {
     }
 
     @Override
-    public Set<String> getMapKeys(SmaliFile smaliFile) {
-        return smaliFile.getMethodMap().keySet();
-    }
-
-    @Override
-    public HashMap<String, String> parentNameChanges() {
-        HashMap<String, String> changes = new HashMap<>();
-        for (SmaliFile parentFile : this.getParentSmaliFile().getParentFileMap().values()) {
-            changes.putAll(parentFile.getMethodNameChange());
-        }
-        return changes;
-    }
-
-    @Override
-    public String appendAfterName() {
+    public String appendAfterID() {
         return "(" + this.methodParameterStr + ")";
     }
 
     @Override
-    public String getAvailableID() {
-        Set<String> takenIDs = getTakenIDs();
-        ArrayList<String> permutations = StringUtils.getStringPermutations();
-
-        for (String perm : permutations) {
-            if (!takenIDs.contains(perm + appendAfterName())) {
-                // new!
-                return perm + appendAfterName();
-            }
-        }
-
-        return "";
+    public HashMap<String, String> getNameChangeMap(SmaliFile smaliFile) {
+        return smaliFile.getMethodNameChange();
     }
+
+    // return the new identifier
 
     @Override
     public void rename() {
         String oldMethodID = this.getIdentifier();
         String newMethodID;
         HashMap<String, String> nameChanges = parentNameChanges();
+
         if (nameChanges.containsKey(this.getIdentifier())) {
             // parent already renamed this
             newMethodID = nameChanges.get(this.getIdentifier());
@@ -105,8 +82,10 @@ public class SmaliMethod implements SmaliBlock {
             return;
         } else {
             // get new method name
-            newMethodID = getAvailableID();
+            newMethodID = getAvailableID(nameChanges);
         }
+
+        assert newMethodID != null;
 
         String[] parts = this.getFirstSmaliLine().getParts().clone();
         parts[parts.length-1] = newMethodID + this.getMethodReturnType();

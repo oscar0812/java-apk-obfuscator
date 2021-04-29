@@ -373,6 +373,7 @@ public class MainClass {
         File outputDir = info.getApkDecompileDir();
 
         decompileWithAPKTool(apkFile, outputDir);
+
         APKInfo.getInstance().fetchDecompiledInfo();
 
         System.out.println("==== DONE DECOMPILING ====");

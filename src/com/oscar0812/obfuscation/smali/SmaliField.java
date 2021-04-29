@@ -1,6 +1,7 @@
 package com.oscar0812.obfuscation.smali;
 
 import com.oscar0812.obfuscation.APKInfo;
+import com.oscar0812.obfuscation.utils.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -13,7 +14,7 @@ import java.util.stream.Collectors;
  .field <access rights> [modification keyword]<field name>:<field type> [= value]
  */
 
-public class SmaliField implements SmaliBlock {
+public class SmaliField implements SmaliBlock{
     private SmaliLine smaliLine;
 
     private String identifier; // field name
@@ -52,21 +53,12 @@ public class SmaliField implements SmaliBlock {
         return this.getSmaliLine().getParentSmaliFile();
     }
 
-    @Override
-    public Set<String> getMapKeys(SmaliFile smaliFile) {
-        return smaliFile.getFieldMap().keySet();
-    }
 
     @Override
-    public HashMap<String, String> parentNameChanges() {
-        HashMap<String, String> changes = new HashMap<>();
-        for (SmaliFile parentFile : this.getParentSmaliFile().getParentFileMap().values()) {
-            changes.putAll(parentFile.getFieldNameChange());
-        }
-        return changes;
+    public HashMap<String, String> getNameChangeMap(SmaliFile smaliFile) {
+        return smaliFile.getFieldNameChange();
     }
 
-    // return the new identifier
     @Override
     public void rename() {
         HashMap<String, String> nameChanges = parentNameChanges();
@@ -74,8 +66,12 @@ public class SmaliField implements SmaliBlock {
         if (nameChanges.containsKey(this.getIdentifier())) {
             newName = nameChanges.get(this.getIdentifier());
         } else {
-            newName = getAvailableID();
+            // generate a new name
+            newName = getAvailableID(nameChanges);
         }
+
+        assert newName != null;
+
         rename(newName);
     }
 
