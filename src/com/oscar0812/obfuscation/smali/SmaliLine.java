@@ -111,10 +111,12 @@ public class SmaliLine {
             if (smaliFileMap.containsKey(referencedFile.getAbsolutePath())) {
                 // referenced class is in main package (I don't want to obfuscate ALL files including libs)
                 SmaliFile referenced = smaliFileMap.get(referencedFile.getAbsolutePath());
+
                 referenced.addReferenceSmaliLine(this);
 
                 // // CREATOR:Landroid/os/Parcelable$Creator;
                 if (ss.getEndIndex() == arrowIndex) {
+
                     // REFERENCE TO METHOD OR FIELD!!
                     String referenceTo = this.getText().substring(arrowIndex + 2);
                     HashMap<String, ArrayList<SmaliLine>> storedRef;

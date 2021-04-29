@@ -127,9 +127,10 @@ public class SmaliMethod implements SmaliBlock{
                 smaliLine.setText(text.replace(replaceThis, newText));
             }
 
-            for (SmaliLine smaliLine : copyOfReferences) {
+            // TODO: removing references here causes errors
+            /*for (SmaliLine smaliLine : copyOfReferences) {
                 smaliLine.getParentSmaliFile().getMethodReferences().remove(oldMethodID);
-            }
+            }*/
         }
     }
 

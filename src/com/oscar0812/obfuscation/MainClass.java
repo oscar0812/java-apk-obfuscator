@@ -143,8 +143,8 @@ public class MainClass {
         // DOESN'T WORK: line 16 of SongLoader: "is_music=1 AND title != \'\'"
         for (SmaliLine smaliLine : smaliLines) {
             String[] parts = smaliLine.getParts();
-            if (parts.length > 2 && parts[parts.length - 1].contains("\\'\\'") && parts[1].equals("v0,")) {
-                // if (parts.length > 2 && parts[parts.length - 1].contains("\\")) {
+            // if (parts.length > 2 && parts[parts.length - 1].contains("\\'\\'") && parts[1].equals("v0,")) {
+            if (parts.length > 2 && parts[parts.length - 1].contains("\\")) {
                 // weird case with const-string if it contains \'\' and stored at v0
                 continue;
             }
@@ -319,6 +319,10 @@ public class MainClass {
         // parallel process lines (7 seconds vs 31 seconds!)
         APKInfo.getInstance().getAllSmaliFileMap().values().parallelStream().forEach(SmaliFile::processLines);
 
+        /*for(SmaliFile smaliFile: APKInfo.getInstance().getAllSmaliFileMap().values()) {
+            smaliFile.processLines();
+        }*/
+
         ArrayList<SmaliFile> smaliFiles = new ArrayList<>(APKInfo.getInstance().getProjectSmaliFileMap().values()); // since it changes
 
         // sort, put parent files first
@@ -337,7 +341,7 @@ public class MainClass {
             // System.out.println("\"" + smaliFile.getAbsolutePath() + "\",");
 
             obfuscateStrings(smaliFile);
-            obfuscateInts(smaliFile);
+            // obfuscateInts(smaliFile);
 
             obfuscateMethods(smaliFile);
             obfuscateFields(smaliFile);

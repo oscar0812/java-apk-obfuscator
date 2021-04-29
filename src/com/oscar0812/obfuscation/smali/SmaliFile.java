@@ -198,6 +198,7 @@ public class SmaliFile extends File {
     public void addMethodLine(SmaliLine smaliLine) {
         String[] parts = smaliLine.getParts();
         if (parts[0].equals(".method")) {
+
             // start of a method
             SmaliMethod sm = null;
             // relink method if rename
