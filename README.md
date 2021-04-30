@@ -1,7 +1,7 @@
 # java-apk-obfuscator
 APK black-box obfuscator for my Master's project. Written 100% in Java.
 
-**warning**: This obfuscator will NOT work if you are using Java Reflection in
+**NOTE**: This obfuscator will NOT work if you are using Java Reflection in
 your code. This project only looks at the available code and connects the dots.
 Reflection hides connections.
 
@@ -34,10 +34,16 @@ Reflection hides connections.
 ### Resource File Renaming
 > Rename drawables and other resource files
 
-## Libraries
+# Example Run
+## Not Obfuscated
+![Not Obfuscated](images/no_obf.png)
+
+## Obfuscated
+![Obfuscated](images/obf.png)
+
+# Libraries
 * [APKTool](https://github.com/patrickfav/uber-apk-signer) to decompile and build Apks
 * [Uber Apk Signer](https://github.com/patrickfav/uber-apk-signer) to sign built Apks
 
-
 # Want to contribute?
-Email me at oscar0812torres@gmail.com, or text me on [Telegram](https://telegram.me/bittle).
+Open an issue!
