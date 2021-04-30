@@ -23,28 +23,13 @@ public class TestStrObf {
     }
 
     public static String a() {
-        byte[] buf = new byte[20];
-        buf[0] = (byte) (1694716808 >>> 11);
-        buf[1] = (byte) (-2103611684 >>> 14);
-        buf[2] = (byte) (736914795 >>> 8);
-        buf[3] = (byte) (1366325835 >>> 16);
-        buf[4] = (byte) (1294814544 >>> 2);
-        buf[5] = (byte) (-1819689607 >>> 10);
-        buf[6] = (byte) (1479479837 >>> 3);
-        buf[7] = (byte) (493304531 >>> 7);
-        buf[8] = (byte) (-797811359 >>> 16);
-        buf[9] = (byte) (-1665206416 >>> 22);
-        buf[10] = (byte) (-1294428316 >>> 23);
-        buf[11] = (byte) (-333390341 >>> 9);
-        buf[12] = (byte) (1563470977 >>> 22);
-        buf[13] = (byte) (2068654534 >>> 7);
-        buf[14] = (byte) (1293699305 >>> 1);
-        buf[15] = (byte) (248715339 >>> 6);
-        buf[16] = (byte) (1323890382 >>> 17);
-        buf[17] = (byte) (1064294748 >>> 6);
-        buf[18] = (byte) (-1385381248 >>> 4);
-        buf[19] = (byte) (826963844 >>> 14);
-        return new String(buf);
+        float f = 0.1f;
+        float f2 = 0.2f;
+        float f3 = -0.005f;
+        if(f > 0.3f - f2) {
+            return "great";
+        }
+        return "not great";
     }
 
 
@@ -59,10 +44,14 @@ public class TestStrObf {
         }
         */
 
-        System.out.println("NO".hashCode());
+        String myString = "-445c28f6";
+        Long i2 = Long.parseLong(myString, 16);
+        Float f2 = Float.intBitsToFloat(i2.intValue());
+        System.out.println(f2);
+        System.out.println(Integer.toHexString(Float.floatToIntBits(f2)));
 
 
-        if(true) {
+        if(1 > 0) {
             return;
         }
 

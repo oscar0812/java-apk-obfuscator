@@ -275,15 +275,13 @@ public class MainClass {
 
         HashMap<String, String> renamedMap = APKInfo.getInstance().getNewToOldRenamedFilePathMap();
         HashMap<String, SmaliFile> allSmaliMap = APKInfo.getInstance().getAllSmaliFileMap();
-        HashMap<String, SmaliFile> projectSmaliMap = APKInfo.getInstance().getProjectSmaliFileMap();
 
         for (String newFilePath : renamedMap.keySet()) {
             String oldFilePath = renamedMap.get(newFilePath);
             SmaliFile smaliFile = allSmaliMap.get(oldFilePath);
 
-            allSmaliMap.put(newFilePath, allSmaliMap.remove(smaliFile.getAbsolutePath()));
-            projectSmaliMap.put(newFilePath, projectSmaliMap.remove(smaliFile.getAbsolutePath()));
-
+            SmaliFile removedFile = allSmaliMap.remove(smaliFile.getAbsolutePath());
+            allSmaliMap.put(newFilePath, removedFile);
 
             while (smaliFile.exists() && !smaliFile.delete()) {
                 System.out.println("COULDN'T DELETE:: " + smaliFile.getAbsolutePath());
