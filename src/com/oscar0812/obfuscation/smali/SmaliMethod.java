@@ -123,7 +123,7 @@ public class SmaliMethod implements SmaliBlock{
             for (SmaliLine smaliLine : copyOfReferences) {
                 String replaceThis = "->" + oldMethodID + methodReturnType;
                 String newText = "->" + newMethodID + methodReturnType;
-                String text = smaliLine.getText();
+                String text = smaliLine.getTextFromParts();
                 smaliLine.setText(text.replace(replaceThis, newText));
             }
 

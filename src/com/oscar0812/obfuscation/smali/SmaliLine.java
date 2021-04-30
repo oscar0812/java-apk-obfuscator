@@ -98,7 +98,7 @@ public class SmaliLine {
         File smaliDir = APKInfo.getInstance().getSmaliDir();
 
         // check if this lines references fields or methods
-        String text = this.getText();
+        String text = this.getTextFromParts();
         int arrowIndex = text.indexOf("->");
 
         // sget-object v2, Lcom/naman14/timber/helpers/MusicPlaybackTrack;->CREATOR:Landroid/os/Parcelable$Creator;
@@ -118,7 +118,7 @@ public class SmaliLine {
                 if (ss.getEndIndex() == arrowIndex) {
 
                     // REFERENCE TO METHOD OR FIELD!!
-                    String referenceTo = this.getText().substring(arrowIndex + 2);
+                    String referenceTo = this.getTextFromParts().substring(arrowIndex + 2);
                     HashMap<String, ArrayList<SmaliLine>> storedRef;
 
                     if (referenceTo.contains("(") && referenceTo.contains(")")) {
@@ -149,7 +149,7 @@ public class SmaliLine {
         }
     }
 
-    public String getText() {
+    public String getTextFromParts() {
         StringBuilder builder = new StringBuilder(whitespace);
         for (int x = 0; x < parts.length; x++) {
             if (x + 1 == parts.length) {
@@ -207,6 +207,10 @@ public class SmaliLine {
 
     public boolean isComment() {
         return text.trim().startsWith("#");
+    }
+
+    public String getOriginalText() {
+        return text;
     }
 
     // run to the end of inSmaliLine chain and join both chains

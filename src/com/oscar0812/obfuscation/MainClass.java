@@ -166,6 +166,19 @@ public class MainClass {
 
         // obfuscate const integers/longs
         for (SmaliLine smaliLine : smaliLines) {
+            String smaliText = smaliLine.getOriginalText();
+
+            // check for floats
+            if (smaliText.contains("#") && smaliText.endsWith("f")) {
+                //     const v2, 0x3f333333    # 0.7f
+                String floatStr = smaliText.substring(smaliText.lastIndexOf("#") + 1, smaliText.length()-1).trim();
+                try {
+                    Float.parseFloat(floatStr);
+                    continue; // it is a float, so don't obfuscate (we only obfuscate ints for now)
+                } catch (NumberFormatException ignored) {
+                }
+            }
+
             if (smaliLine.getParentMethod() != null && !smaliLine.getParentMethod().isConstructor()) {
                 // dont obfuscate constructor const's (for now)
                 SmaliLineObfuscator.getInstance().obfuscateConstInt(smaliLine);
@@ -341,7 +354,7 @@ public class MainClass {
             // System.out.println("\"" + smaliFile.getAbsolutePath() + "\",");
 
             obfuscateStrings(smaliFile);
-            // obfuscateInts(smaliFile);
+            obfuscateInts(smaliFile);
 
             obfuscateMethods(smaliFile);
             obfuscateFields(smaliFile);

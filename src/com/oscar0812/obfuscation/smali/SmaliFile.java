@@ -155,7 +155,7 @@ public class SmaliFile extends File {
 
         // keep a track of comments (for virtual and direct method reference)
         if (sl.isComment()) {
-            String text = sl.getText();
+            String text = sl.getTextFromParts();
             if (text.contains("direct methods") || text.contains("virtual methods")) {
                 lastDescriptiveComment = sl;
             }
@@ -215,7 +215,7 @@ public class SmaliFile extends File {
             if(sm == null) {
                 sm = new SmaliMethod(this, smaliLine);
                 if (lastDescriptiveComment != null) {
-                    String text = lastDescriptiveComment.getText();
+                    String text = lastDescriptiveComment.getTextFromParts();
                     sm.setMethodType(text.contains("virtual") ? "virtual" : text.contains("direct") ? "direct" : "");
                 }
                 methodList.add(sm);
@@ -246,7 +246,7 @@ public class SmaliFile extends File {
                     writer.write("\n");
                 }
 
-                writer.write(line.getText());
+                writer.write(line.getTextFromParts());
                 writer.write("\n");
 
                 line = line.getNextSmaliLine();
@@ -281,7 +281,7 @@ public class SmaliFile extends File {
         // rename references in smali
         ArrayList<SmaliLine> referencedInLines = new ArrayList<>(this.getReferencedInSmaliLines());
         for (SmaliLine smaliLine : referencedInLines) {
-            String text = smaliLine.getText();
+            String text = smaliLine.getTextFromParts();
             String newText = text.replace(this.getSmaliPackage(), renameFileTo.getSmaliPackage());
             smaliLine.setText(newText);
         }

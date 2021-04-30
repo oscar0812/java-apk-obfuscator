@@ -208,7 +208,7 @@ public class SmaliLineObfuscator {
         // add it back in the next line
         String nextLineNewSmaliText = inLine.getWhitespace() + "add-int/lit8 " + register + ", " + register + ", 0x" + Integer.toHexString(randomInt);
 
-        String newSmaliText = inLine.getText().replace("0x" + hex, "0x" + Integer.toHexString(Math.abs(dec)));
+        String newSmaliText = inLine.getTextFromParts().replace("0x" + hex, "0x" + Integer.toHexString(Math.abs(dec)));
         inLine.setText(newSmaliText);
         inLine.insertAfter("").insertAfter(nextLineNewSmaliText);
     }

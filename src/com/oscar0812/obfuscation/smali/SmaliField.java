@@ -1,7 +1,6 @@
 package com.oscar0812.obfuscation.smali;
 
 import com.oscar0812.obfuscation.APKInfo;
-import com.oscar0812.obfuscation.utils.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -111,7 +110,7 @@ public class SmaliField implements SmaliBlock{
         for (SmaliLine smaliLine : smaliLinesPointingToThisField) {
             String replaceThis = "->" + oldFieldName + ":" + this.getFieldType();
             String newText = "->" + newFieldName + ":" + this.getFieldType();
-            String text = smaliLine.getText();
+            String text = smaliLine.getTextFromParts();
             smaliLine.setText(text.replace(replaceThis, newText));
         }
 
